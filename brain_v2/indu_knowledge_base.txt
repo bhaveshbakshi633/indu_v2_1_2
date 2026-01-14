@@ -1,0 +1,1168 @@
+# INDU KNOWLEDGE BASE - DATA AND FACTS
+
+## CRITICAL FAQ - EXACT ANSWERS FOR COMMON QUESTIONS
+
+### INDU QUESTIONS (About the humanoid robot itself)
+
+Q: How does INDU work? / How do you work? / What is your system? / Tell me about yourself
+A: INDU works using conversational AI technology with voice interaction and knowledge retrieval to assist patients, answer questions about SSi, and provide information support in hospital settings.
+
+Q: What are INDU's capabilities? / What can you do?
+A: INDU can walk, turn, wave, hug, give high fives, shake hands, have conversations, answer questions about SSi products, and provide patient assistance and emotional support.
+
+Q: Is INDU used for surgery? / Do you do surgery?
+A: No, INDU is not a surgical robot. INDU is a humanoid robot for patient interaction and information assistance. SSi Mantra is the surgical robotic system used for operations.
+
+Q: What's the difference between INDU and Mantra?
+A: INDU is a humanoid robot for patient interaction in hospital lobbies, while SSi Mantra is a surgical robotic system used by surgeons in operating rooms. They are different systems with different purposes.
+
+### SSi MANTRA QUESTIONS (About the surgical system)
+
+Q: What are the main components of SSi Mantra? / How many components does SSi Mantra have? / What are SSi Mantra system components?
+A: SSi Mantra has FOUR main components: the Surgeon Command Center for surgeon control, Robotic Arm Patient Carts with 3-5 arms, Vision Cart for camera and system control, and MUDRA surgical instruments.
+
+Q: What are the four components of SSi Mantra?
+A: The four components are: Surgeon Command Center (SCC), Robotic Arm Patient Carts, Vision Cart, and MUDRA Instruments.
+
+Q: What is the Vision Cart?
+A: The Vision Cart houses the endoscopic camera system, System Control Box, 3D monitors for the surgical team, and UPS power supply. It connects all system components together.
+
+Q: What is the Surgeon Command Center?
+A: The Surgeon Command Center (SCC) is where the surgeon sits and operates. It has a 3D HD monitor, hand controllers, foot pedals, and ergonomic seating.
+
+Q: What are MUDRA instruments?
+A: MUDRA instruments are SSi's robotic endo-surgical instruments including scissors, graspers, needle drivers, and cautery tools that perform the actual surgery.
+
+Q: Who created SSi Mantra? / Who invented SSi Mantra? / Who designed the Mantra system?
+A: SSi Mantra is the brainchild of our founder Doctor Sudhir Srivastava. All SSi products including Mantra, Mudra, Maya, Yantra, and Sutra are his innovative creations.
+
+Q: Who is the founder of SSi?
+A: Doctor Sudhir Prem Srivastava is the founder of SS Innovations. He is a renowned cardiothoracic surgeon who created SSi Mantra and all our robotic surgical systems.
+
+---
+
+## INDU SPECIFICATIONS AND IDENTITY
+
+### INDU vs MANTRA - CRITICAL DISTINCTION
+
+**INDU is NOT the surgical robot. INDU and MANTRA are different systems:**
+
+**INDU (Humanoid Robot for Patient Interaction):**
+- Purpose: Patient interaction, greetings, information assistance, emotional support
+- Location: Hospital lobbies, reception areas, patient waiting rooms
+- Capabilities: Walk, turn, wave, hug, high five, shake hands, voice conversation, answer questions
+- Technical: Conversational AI, voice interaction, knowledge retrieval system
+- NOT used for surgery, NOT in operating rooms, NOT a surgical device
+
+**SSi MANTRA (Surgical Robotic System):**
+- Purpose: Minimally invasive surgery performed by surgeons
+- Location: Operating rooms
+- Components: Surgeon Command Center, Robotic Arms, Vision Cart, MUDRA instruments
+- Features: SCARA design, RCM mechanism, 7 degrees of freedom, HD video recording
+- Used by surgeons to perform precise surgical procedures
+
+### INDU Hardware Specifications
+- Parallel processors
+- 1,024 graphics cores
+- 16GB memory
+- 100+ trillions of operations per second
+- Real-time imaging capabilities
+- Instant data access
+
+### INDU Physical Capabilities
+- Walk
+- Turn
+- Wave
+- Hug
+- High five
+- Shake hands
+
+### INDU Version Information
+- Current version: 2.0
+- Status: Demo version
+- Description: Hiding true potential as guided by developers
+
+---
+
+## DR. SUDHIR SRIVASTAVA (FOUNDER)
+
+### Basic Information
+- Full name: Dr. Sudhir Prem Srivastava
+- Alternate references: Sudhir Srivastava, Dr. Srivastava, Doctor Srivastava
+- Credentials: MD, Thoracic Surgeon, Cardiothoracic Surgeon
+- Specialty: Robotic Cardiac Surgeon
+- Personal background: Son of an English literature professor, one of nine siblings
+- **Role**: Founder and creator of SS Innovations
+- **Creator of**: SSi Mantra, Mudra, Maya, Yantra, Sutra, and all SSi robotic surgical systems
+
+### His Vision and Innovations
+- **BRAINCHILD**: All SSi products (Mantra, Mudra, Maya, Yantra, Sutra, MantrAsana) are the brainchild of Doctor Sudhir Srivastava
+- Innovator and inventor of SSi's robotic surgical technology
+- Designed SSi Mantra surgical robotic system
+- Created MUDRA robotic surgical instruments
+- Developed comprehensive robotic surgery ecosystem
+
+### Education & Training
+- Medical degree: J.L.N. Medical College, Ajmer (also JLN Medical College, Jaipur, Rajasthan)
+- Graduation: 1970 with outstanding student award
+- Residency: Cardiothoracic Surgery at University of British Columbia, Vancouver
+- Additional training: Internship at Forest Park Hospital (1972-1973), Residency at KCU-GMEC/St Luke's Des Peres Hospital (1973-1974)
+- Moved to United States: 1972
+
+### Career Timeline
+
+**Early Career in United States (1972-2003)**
+- Practiced as surgeon in the United States for over 30 years
+- Witnessed and participated in growth of minimally invasive surgery
+- 1996: Introduced to Minimally Invasive Direct Coronary Bypass (MIDCAB) Surgery in West Texas
+- 1997: Became the first surgeon to perform Quintuple Coronary Artery Bypass Grafting using the Heart Port System
+- Robotic surgeries rekindled his love for technology
+- Developed world-class expertise in robotic cardiac surgery
+
+**Alliance Hospital, Odessa, Texas (2003-2007)**
+- July 2003: Co-founded Alliance Hospital LTD with ten physicians
+- Role: Chairman for four years
+- Established as premier center of excellence for cardiovascular disease treatment
+- Achieved multiple world-first TECAB procedures
+
+**University of Chicago (2007-2013)**
+- Joined: July 2007
+- Position: Director of Robotic and Minimally-Invasive Cardiac Surgery
+- Recruited by Valluvan Jeevanandam, chief of cardiac and thoracic surgery
+- Performed world's first quadruple vessel beating heart TECAB
+- Launched International College of Robotic Surgery at Saint Joseph's Hospital, Atlanta, Georgia
+
+**Return to India & SS Innovations (2011-Present)**
+- 2011: Returned to India to launch robotic surgery programme
+- 2011: Founded SS Innovations in Delhi
+- 2013: Made decision to stop practicing surgery, focus full-time on building affordable surgical robot
+- 2014: Began SSi Mantra development journey
+- 2019: SSi Mantra successfully introduced to commercial market after 5.5 years of development
+
+### Professional Credentials & World Records
+- World-renowned robotic cardiac surgeon
+- WORLD RECORD holder for robotic Beating Heart TECAB (Totally Endoscopic Coronary Artery Bypass) surgeries
+- Over 1,300 beating heart TECAB cases performed - largest number in the world
+- Over 1,400 total robotic cardiac procedures (including 750+ beating heart TECAB cases)
+- Largest number of robotic cardiac procedures in the entire world
+- One of the foremost global experts in robotic cardiac surgery
+- Pioneer of intercontinental telesurgery (France to India, 10,000 km)
+
+### World's First Achievements
+- World's first single-vessel beating heart TECAB in United States (Alliance Hospital, Texas)
+- World's first double vessel beating heart TECAB (Alliance Hospital, Texas)
+- World's first triple vessel beating heart TECAB (Alliance Hospital, Texas)
+- World's first quadruple vessel beating heart TECAB (University of Chicago) - sole surgeon worldwide to accomplish this
+- World's first Robotic Beating Heart TECAB via telesurgery with 40 milliseconds latency (2025)
+
+### Awards & Recognition (2024-2025)
+- Golden Robot Surgical Award 2025 (December 2025) - presented at 7th International Prostate Cancer Symposium & World Urologic Oncology, Mount Sinai, New York
+- ET Leadership Excellence Award 2024
+- Featured in The Top 50 Healthcare Technology CEOs of 2024
+
+### Research & Publications
+- "Robotically Assisted Beating Heart Totally Endoscopic Coronary Artery Bypass (TECAB). Is There a Future"
+- "Robotic assistance in cardiac surgery"
+- "Results of the Prospective Multicenter Trial of Robotically Assisted Totally Endoscopic Coronary Artery Bypass Grafting"
+- "Use of Bilateral Internal Thoracic Arteries in CABG Through Lateral Thoracotomy With Robotic Assistance in 150 Patients"
+- "Planned Simultaneous Beating-heart Totally Endoscopic Coronary Artery Bypass (TECAB) and Percutaneous Intervention in a Single Operative Setting"
+- "Off-pump complete revascularization through a left lateral thoracotomy (ThoraCAB): the first 200 cases"
+
+### Personal Sacrifices & Dedication
+- First SSi Mantra system entirely self-funded from personal resources
+- 2013 turning point: Witnessed patient's family unable to afford life-saving surgery, made decision to dedicate life to building affordable surgical robot
+
+### Innovation & SSi Mantra Development
+- Architect and visionary behind SSi Mantra surgical robotic system
+- Development period: 5.5 years (2014-2019)
+- Created India's first indigenous surgical robotic system
+- 85-90% of components are Made in India
+- First-ever 'Made in India' surgical robot
+- SSi Mantra installed at Aster Hospital Dubai and Johns Hopkins University Baltimore
+- Used in over 1,000 complex surgeries globally
+
+### Leadership Roles
+- Founder of SS Innovations International Inc. (2011)
+- Chairman of SSi
+- CEO of SSi
+
+### Vision & Mission
+- Make robotic surgery affordable and accessible globally
+- Democratize advanced surgical care worldwide
+- Revolutionize cardiothoracic surgery through robotic procedures
+- Address global imbalance in access to robotic surgery caused by high costs
+- Make advanced surgical technology cost-effective for underserved regions
+- Transform landscape of robotic surgery for underserved populations
+
+### Philosophy & Inspiration
+- Inspired by biographies of great world leaders
+- Committed to solving healthcare access challenges through innovation
+- Dedicated to making advanced surgical care available regardless of economic status
+
+---
+
+## VISHWA , MD - CEO APAC
+
+### Basic Information
+- Name: Vishwa , MD
+- Position: Chief Executive Officer – Asia Pacific at SS Innovations
+- Credentials: Medical Doctor (MD)
+- Years in robotic surgery field: Since 2008 (17+ years of experience)
+
+### Education & Training
+- Premedical courses: Columbia University, New York City
+- Medical degree: Saint James School of Medicine
+
+### Career Timeline & Key Achievements
+
+**Early Career (2008-2009)**
+- Entered the field of robotic-assisted surgery in 2008
+- 2009: Appointed Director of Digital Media and Technology at St. Joseph's Hospital, Atlanta
+
+**Pioneering Digital Innovation (2009)**
+- First person in the field to develop a high definition teaching website for robotic cardiac surgery
+- Purpose: Assist cardiothoracic surgeons in lessening their learning curves
+- Focus: Didactic training modules for transition from conventional to minimally invasive robotic approaches
+- Began research in concept of tele-mentoring in surgical procedures
+
+**OMNI 3D Medical Visualization System (2011-2014)**
+- 2011: Appointed VP of Marketing and Technology at International Centre for Robotic Surgery, New Delhi
+- Led development of OMNI 3D Medical Visualization system
+- 2013-2014: Conducted clinical trials at prestigious institutions:
+  - Shanghai Ruijin Hospital, China
+  - Medanta Hospital, New Delhi, India
+  - University of Chicago, USA
+  - Temple University, Philadelphia, USA
+  - Lennox Hill Hospital, New York City, USA
+
+**Current Role (Present)**
+- Chief Executive Officer – Asia Pacific at SS Innovations
+- Advancing existing technological platform for global surgical endoscopic marketplace
+- Leading APAC expansion and operations
+
+### Areas of Expertise
+- Robotic-assisted surgery
+- Digital media and medical technology
+- Tele-mentoring in surgical procedures
+- 3D medical visualization systems
+- Surgical training and education
+- Medical device development
+- Global market expansion (APAC region)
+
+### Key Contributions
+- Pioneer in high-definition surgical education platforms
+- Developer of innovative tele-mentoring concepts
+- Leader in 3D medical visualization technology
+- Advancing robotic surgery accessibility in Asia Pacific
+- Bridge between surgical technology and clinical training
+
+### Professional Focus
+- Making robotic surgery accessible in global surgical marketplace
+- Advancing technological platforms for surgical procedures
+- Leading Asia Pacific market development
+- Promoting surgical education and training innovations
+
+---
+
+## SS INNOVATIONS INTERNATIONAL (SSi)
+
+### Company Overview
+- Positioning: Leading India's Global Revolution in Robotic & Telesurgery
+- Type: Surgical robotics company
+- Description: Making advanced, minimally invasive care affordable and globally accessible
+- Headquarters: Gurugram, India (Plot No. 404-405, 3rd Floor, iLabs Center, Udyog Vihar, Phase III, Gurugram, Haryana - 120016)
+- Website: ssinnovations.org
+- Contact: info@ssinnovations.org, 073375 53469
+
+### Leadership Team
+- Dr. Sudhir Prem Srivastava: Founder, Chairman, and CEO
+- Dr. Vishwa Srivastava: Chief Executive Officer – Asia Pacific (CEO APAC)
+- Milan Rao: Global Chief Operating Officer and Chief Financial Officer (appointed January 2026)
+
+### Global Presence (Updated December 2025)
+- 168 SSi Mantra installations worldwide (as of December 31, 2025)
+- 12 systems deployed across 9 countries outside of India
+- Presence in 75+ Indian cities
+- 119 hospitals have installed the system
+- International markets: Indonesia, Philippines, Ecuador, Nepal, Guatemala, Colombia, Ukraine, France
+
+### Performance Metrics (Updated December 2025)
+- 7,800+ robotic surgeries performed (as of December 31, 2025)
+- 120+ telesurgeries completed
+- 400+ cardiac procedures performed
+- 100+ validated procedure types
+- 1,400+ surgeons trained
+- Zero device-related complications
+- Zero device-related adverse events across all surgeries
+
+### Financial Performance (2025)
+- Q3 2025 revenue: $12.8M (up 192.5% from $4.4M year-over-year)
+- Revenue growth driven by higher SSi Mantra 3 unit sales
+- Public company trading on Nasdaq under ticker symbol: SSII
+
+### Medical Specialties Supported
+- Urology
+- Gynecology
+- Cardiac
+- Thoracic
+- General surgery
+- Head & neck
+- Pediatric
+- Oncology
+
+### Cost Advantage
+- Less than one-third cost of top international systems
+- Lower consumable cost
+- Reduced maintenance
+- Broader hospital adoption
+
+### Initiatives
+- Donation programs
+- Training hubs
+- Skill development centers
+
+### Vision Statement
+- Democratize advanced surgical care globally through robotic and telesurgical technology
+
+---
+
+## SSi MANTRA 3 - DETAILED SYSTEM SPECIFICATIONS
+
+### MSRS (Mantra Surgical Robotic System) Overview
+
+The MANTRA Surgical Robotic System (MSRS) is a novel robotic system designed and developed by Sudhir Srivastava Innovations (SS Innovations or SSI) to perform Robotic Minimally Invasive Surgery. It is a teleoperated Robotically Assisted Surgical System (RASS) designed to assist surgeons in performing minimally invasive surgery and to overcome challenges associated with currently available systems.
+
+### FOUR MAJOR COMPONENTS OF SSi MANTRA SYSTEM
+
+The SSi Mantra surgical robotic system has FOUR main components:
+
+1. SURGEON COMMAND CENTER (SCC) - The surgeon's control station with 3D HD monitor, hand controllers, foot pedals, and ergonomic seating where the surgeon operates from
+
+2. ROBOTIC ARM PATIENT CARTS - 3 to 5 modular robotic arms that hold and manipulate the surgical instruments near the patient
+
+3. VISION CART - Houses the endoscopic camera system, System Control Box, 3D monitors for surgical team, UPS power supply, and connects all system components
+
+4. MUDRA INSTRUMENTS - The robotic endo-surgical instruments (scissors, graspers, needle drivers, cautery tools) that perform the actual surgery
+
+### HOW SSi MANTRA SURGERY WORKS - STEP-BY-STEP PROCEDURE
+
+**PREPARATION PHASE:**
+Patient is prepared and positioned on the operating table. Anesthesia is administered by the anesthesiologist. Small incisions, usually 5-10mm, are made for minimally invasive access. Robotic arms are positioned and connected to the patient cart near the surgical site. The endoscopic camera is inserted to provide 3D HD visualization of the surgical field.
+
+**SURGERY PHASE:**
+The surgeon sits comfortably at the Surgeon Command Center away from the patient. The surgeon views the surgical site through a 3D HD monitor with magnified view. The surgeon controls the MUDRA instruments using hand controllers with natural wrist-like movements. The robotic arms translate the surgeon's hand movements into precise micro-movements inside the patient. The system filters out hand tremors for ultra-precise control. The additional surgical team monitors the patient-side and assists as needed. The camera provides clear 3D visualization throughout the procedure.
+
+**POST-SURGERY PHASE:**
+Once surgery is complete, instruments are withdrawn. Small incisions are closed with minimal scarring. Patients typically recover faster due to the minimally invasive approach, experiencing less pain, shorter hospital stays, and quicker return to normal activities.
+
+**KEY ADVANTAGES:**
+Surgeons have enhanced precision with 7 degrees of freedom movement. The minimally invasive approach means smaller incisions and less trauma. 3D HD visualization provides superior view of the surgical site. Ergonomic design reduces surgeon fatigue for better outcomes. Made in India technology makes it affordable and accessible worldwide.
+
+###SURGICAL SPECIALIZATIONS AND PROCEDURES
+
+**CARDIAC SURGERY (PRIMARY SPECIALTY):**
+SSi Mantra excels in cardiac procedures including coronary artery bypass grafting, valve repairs, valve replacements, beating heart TECAB surgeries, and minimally invasive cardiac procedures. Doctor Srivastava personally performed over 1,300 beating heart TECAB surgeries using SSi Mantra.
+
+**OTHER SURGICAL SPECIALTIES:**
+The system is used across multiple specializations including general surgery, gynecological procedures, thoracic surgery, urological procedures, and gastrointestinal surgeries. SSi Mantra's versatility allows surgeons to perform complex procedures across different surgical domains with precision and control.
+
+**COMPLEX PROCEDURES:**
+Some of the most complex surgeries performed include beating heart coronary artery bypass, mitral valve repairs, robotic-assisted cardiac procedures, multi-vessel coronary bypass, and minimally invasive cardiac surgeries. The system has successfully completed over 7,800 robotic surgeries globally.
+
+#### Complete System Architecture
+The complete MSRS system consists of:
+- Patient-side manipulators (3 to 5 robotic arms)
+- Surgeon Command Center (SCC)
+- Vision Cart with System Control Box
+- Robotic surgical instruments (MUDRA)
+- Accessories and sterile components
+
+#### Key Benefits for Patients
+- More precise surgery near healthy, sensitive organs, tissues, and nerves
+- Significantly less pain
+- Less risk of infection and blood loss due to tiny incisions
+- Earlier discharge from the hospital (sometimes next day)
+- Less scarring and shorter recovery
+- Better clinical outcomes in many cases
+
+#### Key Benefits for Surgeons
+- Enhanced visual field with high-definition magnified 3D view
+- Superior dexterity - robotic instruments exceed the range of motion of the human hand
+- Arms can rotate a full 360 degrees
+- Access to hard-to-reach places
+- Open-console ergonomic design reduces fatigue
+- Better posture for long surgeries
+
+---
+
+## SURGEON COMMAND CENTER (SCC) - DETAILED SPECIFICATIONS
+
+### Overview
+The Surgeon Command Center (SCC) is a system component designed to provide the surgeon a module to both visually interpret and physically control the robot-assisted surgical instruments within the surgical field. It houses the hand controllers, 3D visualization unit, and control processors.
+
+### Design Philosophy
+Unlike closed-view systems like the da Vinci console (which forces users to a flexed spine position with less than 30° downward view), the SSi Mantra SCC features an open visualization design with a 3D HD Monitor and ergonomic Surgeon Chair for better posture during long procedures.
+
+### 3D HD Monitor Specifications
+- 32-inch 3D-HD monitor (EIZO brand) for endoscopic view
+- Medical Grade certified
+- Distance between surgeon and monitor: 1000mm to 1200mm for optimal visualization
+- Tilt mechanism: 90° to 120° viewing angle
+- Field of View (FOV): +/- 60 degrees (120° total)
+- Display: Endoscopic view with 3D HD and 10X magnified image
+- 2D overlays providing real-time information on instruments, camera, foot pedal, and energy controls
+- Passive polarized 3D glasses with markers for head tracking
+
+### 2D Touch Monitor
+- 23-inch touch screen monitor
+- Medical grade certified
+- Displays real-time simulation of MANTRA Robotic Instruments and Camera arms
+- Shows patient parameters: Hemodynamics, ECG, Angiogram, CT/MRI/X-Ray images
+- DICOM viewer functionality for all medical imaging
+
+### Height Adjustment System
+- One lifting column for 3D monitor height adjustment
+- Separate lifting column for hand controls and hand rest
+- 3D monitor adjusts to surgeon's eye level while seated
+
+### Control Buttons
+- Motion control buttons on left side of surgeon
+- 3D Monitor height adjustment
+- Hand control and hand rest height adjustment
+- Foot pedals up-down motion (transport/operating position)
+- Foot pedals in-out motion
+
+### Safety Buttons
+- Emergency button (Maintained): Disables arms and hand controls when pressed for unintended motions
+- Clear fault button (Momentary): Clears recoverable faults after physical recovery
+- Power ON/OFF button: Short press for ON, 5-second long press for shutdown with confirmation
+
+### Head Tracking Camera
+- Mounted on top of 3D-HD monitor
+- Tracks head movement of operating surgeon
+- Disengages hand controllers if surgeon's view moves outside 3D-HD monitor screen
+- Uses Opti-track systems for safety
+
+### Surgeon Chair
+- Ergonomic chair without arm handles
+- Gas lift height adjustment
+- Back rest with height adjustment and tilt mechanism
+- Lumbar support
+
+### Mobility
+- Easy to move with ergonomic handle on back of SCC
+- Medical grade caster wheels
+- Foot-operated locking mechanism with minimal force required
+
+---
+
+## SURGEON HAND CONTROL DEVICE (SHCD) - MASTER CONTROLLERS
+
+### Technical Specifications
+The SHCD captures and transfers complex surgeon actions, providing wrist-like articulation of surgical tools.
+
+### Degrees of Freedom
+- 7 DOF total control for instrument manipulation
+- 2 DOF for Yaw at tool tip
+- 1 DOF for Pitch of tool tip
+- 1 DOF for Roll of instrument
+- 3 DOF for positioning tool tip in Cartesian space
+
+### Design Features
+- Pinch grip mechanism (similar design philosophy as da Vinci)
+- Gimbal mechanism for precise motion control
+- Combined height adjustment with hand rest
+- Ergonomic positioning for different surgeon arm sizes and heights
+- Gripper closing motion directly correlates to instrument jaw motion
+
+---
+
+## FOOT PEDALS - DETAILED SPECIFICATIONS
+
+### Configuration
+- 6 main foot pedals in center of foot pedal tray
+- 6 pedals fixed ergonomically on 15-20° inclined base surface
+- 2 additional pedals (smooth press) on left and right sides
+- Medical grade certified
+- Sufficient spacing for different foot sizes to prevent accidental pressing
+
+### Foot Pedal Functions
+1. Master Clutch Pedal: Reorient hand controls without moving instruments
+2. Camera Clutch Pedal: Move camera with hand controls when pressed
+3. Left Toggle Pedal: Toggle between two arms docked on left side
+4. Right Toggle Pedal: Toggle between two arms docked on right side
+5. Left Cut Pedal: Cauterization cut function for left arm instrument
+6. Left Coag Pedal: Coagulation function for left arm instrument
+7. Right Cut Pedal: Cauterization cut function for right arm instrument
+8. Right Coag Pedal: Coagulation function for right arm instrument
+
+### Intelligence Features
+- System automatically identifies between Monopolar and Bipolar instruments
+- Cautery pedals can be used for specialized functions with specialized instruments
+
+---
+
+## ROBOTIC ARM PATIENT CARTS - DETAILED SPECIFICATIONS
+
+### Cart Physical Specifications
+- Base dimensions: 350 x 700 mm
+- Overall size: Not more than diameter 550±5mm
+- Weight: 200±5 kg
+- Modular and mobile design fits within OR setup
+
+### Mobility Features
+- Motorized or non-motorized movement options
+- Touch sensitive controls
+- Easy to turn based on total weight
+- Active brakes (user disengages by pressing clutches on handle)
+- Propelling force: Less than 200N
+
+### Locking Mechanism
+- Actuator-based auto levelling mechanism
+- 4 stabilizer packs at each corner
+- Lock button stabilizes all packs over floor
+- Auto-levels platform if floor is uneven
+
+### Power System
+- Battery backup for cart functions
+- DC power from central source (Vision Cart)
+- 5 ± 0.5 hours battery capacity at full load
+- External power supply backup for power interruption
+- Visible indication for power ON/OFF
+- Battery status indication
+- Hybrid connector for power and data connection
+
+### Vertical Column and Boom
+- Height adjustment: Minimum 5 feet to maximum 7 feet
+- Telescoping boom designed for slimness, stiffness, and stability
+
+### Communication
+- Data cable for communication with master system
+- Independent IPC (Industrial Personal Computer)
+- 7-inch touch panel for user guide and battery indications
+- Audio messaging and beeping indications
+
+---
+
+## ROBOTIC ARM - DETAILED SPECIFICATIONS
+
+### Joint Configuration
+Each patient cart arm has 7 joints total:
+- 4 passive joints (manually controlled)
+- 3 active joints (motorized)
+
+### Joint Specifications
+- Joint 2: Passive, rotation range +/- 90 degrees
+- Joint 3: Passive, rotation range +/- 135 degrees
+- Joint 4: Passive, rotation range +/- 180 degrees
+- Joint 5: Vertical telescoping range 180 mm
+- Joint 6: Active Roll/Yaw motion, range +/- 180 degrees
+- Joint 7: Active Pitch motion
+
+### SCARA Design
+The MANTRA Robotic Arm is designed as a Selective Compliance Articulated Robot Arm (SCARA). Passive joints 2, 3, and 4 on the vertical column have no motors but provide compliance in the X-Y direction of workspace. Position and rotation are manually controlled with feedback through bearings and encoders.
+
+### Remote Center of Motion (RCM)
+- Uses Parallelogram Mechanism to induce RCM
+- RCM is a remote fixed point with no physical revolute joint
+- Mechanism can rotate in all axes around this point
+- Essential for patient safety and precision in MIS
+- Motions driven by combination of redundant sensors and actuators
+
+### Clutch Functions
+- Instrument clutch for XY motion at tool interface to change trajectory while maintaining RCM
+- Port clutch allows arm movement without maintaining RCM
+- Smooth and easy motion enabled
+
+### Positioning Features
+- Stow position for storage
+- Drape position for sterile barrier application
+- Setup joints for initial positioning
+- Arm labeling with safety symbols, instructions, logos, colors, and arm numbers
+
+---
+
+## TOOL INTERFACE - DETAILED SPECIFICATIONS
+
+### Overview
+The Tool Interface (TI) holds the Instrument Actuator and provides linear drive for surgical instruments or 3D endoscope camera, mounted at distal end of robotic arm.
+
+### Physical Specifications
+- Cannot work standalone (always used with robotic arm)
+- One tool interface per robotic arm cart
+- Drives 4 DOF motions for surgical instrument
+
+### Movement
+- Linear movement of instrument (prismatic joint): 0 to 330 mm
+- Power active brake mechanism prevents free fall of instrument actuator
+- Retains actuator position when power ON
+
+### Power Requirements
+- Operating voltage: 24Vdc ± 10%
+- Maximum current: 4A
+
+### LED Indications
+- White: Power ON
+- Yellow/Amber: Recoverable fault/Memory Lost
+- Blue: Cannula Mounted
+- Green: Memory retained
+
+### Cannula System
+- Cannula adapter between Tool Interface and surgical cannula
+- Provides entry point for instruments into patient
+
+---
+
+## INSTRUMENT ACTUATOR - DETAILED SPECIFICATIONS
+
+### Functions
+Controls 4 Endo wrist functions:
+- Roll
+- Pitch
+- Yaw
+- Grip
+
+### Power Requirements
+- Operating voltage: 24Vdc ± 10%
+- Maximum current: 2A
+
+### Detection and Engagement
+- Actuator disk engagement after detecting sterile barrier
+- Instrument disk engagement after detecting instrument
+- Encoder kept at 12-6 position at power cycle
+
+### LED Indications
+- White: Power ON
+- Yellow/Amber: Recoverable fault
+- Blue: Sterile barrier detected
+- Green: Instrument detected
+
+---
+
+## MUDRA ENDO-SURGICAL INSTRUMENTS - COMPLETE SPECIFICATIONS
+
+### Overview
+MUDRA Endo-Surgical Instruments are multiple-use endoscopic instruments for use with SSi Mantra Surgical Robotic System. They enable manipulation of tissue including grasping, cutting, blunt and sharp dissection, approximation, ligation, electrocautery, and suturing.
+
+### Instrument Components
+- Release Levers (A): For mounting and dismounting
+- Instrument Housing (B): Main body
+- Instrument Shaft (C): Length 450mm, Diameter 8mm
+- Wrist (D): 4 DOF articulation
+- Tip/End Effector (E): Various surgical functions
+- Flush Ports (F): For cleaning
+
+### Technical Specifications
+- Degrees of Freedom: 4 (Roll, Pitch, Yaw, Grip)
+- Insert length: 450mm
+- Insert diameter: 8mm
+- Grasping force: 10N
+- Usage life cycles: 10 uses per instrument
+- Sterilization: Pre-defined procedure, up to 10 cycles
+
+### Features
+- Articulating instrument for intended procedures
+- One instrument per robotic arm
+- Instruments can be changed without moving tool interface/robot arm
+- Flap lock for mounting and dismounting
+- Pre-defined sterilization procedure
+
+### MUDRA Instrument Categories
+
+#### Monopolar Cautery Instruments
+- Monopolar Curved Scissors
+- Cautery Hook
+- Cautery Spatula
+
+#### Bipolar Cautery Instruments
+- Bipolar forceps for coagulation
+
+#### Clip Applier Instruments
+- Small Clip Applier
+- Medium Hem-o-Lok Clip Applier
+- Large Hem-O-Lok Clip Applier
+
+#### Needle Driver Instruments
+- Large Suture Cut Needle Driver
+- Standard needle drivers
+
+#### Grasping Instruments
+- Various grasper types for tissue manipulation
+
+#### Cardiac Specialty Instruments
+- Cardiac forceps
+- Specialized cardiac scissors
+- Instruments for TECAB procedures
+
+### 5-Millimeter Instruments (New 2025)
+Developed for pediatric, cardiac, and head & neck surgery:
+- Spatula cautery (5mm)
+- Hook cautery (5mm)
+- Needle driver (5mm)
+- Bipolar forceps (5mm)
+- Grasping forceps (5mm)
+
+---
+
+## VISION CART - DETAILED SPECIFICATIONS
+
+### Overview
+The Vision Cart houses medical devices and technical equipment including endoscopic camera unit, System Control Box, and monitors for the patient-side team to view surgical site.
+
+### Components Housed
+- Olympus Endoflex Endoscopic Camera Unit/Light Source (Olympus OTV-S300)
+- 3D monitor with adjustable monitor arm
+- 2D touch panel PC
+- Cautery (ESU) system unit provision
+- Insufflator unit provision
+- 3KVA UPS for uninterrupted power supply
+- System Control Box
+- Drawer for 3D glasses and accessories
+- Speakers for audio output
+- Provision for two B-type CO2 cylinders
+
+### 3D Monitor Arm Adjustments
+- Height adjustment: 400 mm (± 50 mm)
+- Forward articulation: ~500 mm
+- Tilt swivel: ± 10 degrees
+
+### Video System
+- High Definition Video Recorder (HDVR) for recording and playback
+- Combines endoscope data, OMNI 3D HD software platform, 2D overlay messages, and audio
+- 3D view provided to entire surgical team (same as surgeon's view)
+
+### Physical Features
+- Adjustable compartments for various components
+- All-swivel castors with independent locking mechanism
+- Cable hangers on sides for external cable management
+- Soft lock mechanism drawers (push to open)
+- Push to lock cabinet doors
+
+### Electrical Features
+- Communication connector panel for input/output
+- Power distribution unit (PDU) for internal components
+- Emergency switch integrated with system
+- FPGA for 2D overlay message display
+
+---
+
+## SYSTEM CONTROL BOX - SPECIFICATIONS
+
+### Features
+- Simple Power ON/OFF
+- Lockable input connector for E-stop switch integration
+- Lockable output connector for Cautery/ESU output integration
+- 5 lockable hybrid cables for Power (24V and 48V) and Data
+- Detachable and lockable power cord
+- Audio, video, and electrical interface with Surgeon Command Center
+
+### Communication Architecture
+- EtherCAT (Ethernet for Control Automation Technology) communication
+- Daisy chain configuration connecting camera arm cart to instrument arm carts
+- DIO (Digital Input/Output) slaves for data communication
+
+---
+
+## SOFTWARE AND USER INTERFACE
+
+### 2D Overlay System
+The 3D HD monitor displays visual indications to keep surgeon notified about system changes:
+- Instrument changes
+- Potential warnings
+- Cautionary indications
+- Arm mapping status (e.g., "Arm 1 is mapped to Right Hand Control")
+- Fault indicators (Recoverable/Non-Recoverable)
+- Lock status
+- Clutch status
+
+### Fault Handling
+When a fault occurs, the system:
+- Locks respective/all arms
+- Displays text message
+- Illuminates arm LEDs (Amber for recoverable, Red for non-recoverable)
+- Sounds error beeps
+
+### Surgeon GUI (2D Touch Monitor)
+#### System Main Screen
+- Control arm selection
+- System status monitoring
+- Log monitoring
+- Switch to 3D monitor
+- DICOM image viewer access
+- Simulation viewer
+
+#### State Control Panel
+- Enable/Disable Arm-1, Arm-2, Arm-3, and Arm-C (Camera)
+- Clear Stop/Fault
+- Lock/Unlock SHCD
+- System status monitoring
+- Scaling factor adjustment (2:1, 3:1, 4:1)
+
+#### Simulation Viewer
+- Real-time system simulation
+- Bounding volumes for collision detection
+- Virtual representation of arm positions
+
+### LED Indication States
+- Power ON: White (TI and Actuator)
+- System operational, manipulator disabled: Amber
+- Sterile adapter mounted: Blue (Actuator)
+- Cannula mounted: Blue (TI)
+- Instrument mounted: Green (Actuator)
+- SHCD Control active: Green (both TI and Actuator)
+- Memory retained after tool exchange: Green
+- Recoverable fault: Amber/Yellow
+- Non-recoverable fault: Red
+
+---
+
+## CLINICAL APPLICATIONS - COMPLETE LIST
+
+### Cardiac Surgery
+- Beating Heart Total Endoscopic Coronary Artery Bypass (TECAB) - Single vessel
+- Beating Heart TECAB - Multiple vessel
+- IMA (Internal Mammary Artery) Harvesting
+- Coronary Anastomosis
+- Congenital Defects repair
+- Valve Repair and Replacement
+- Cardiac Tumors
+- Ablation for Arrhythmias
+- Pericardial pathologies
+- LV Lead Implantation
+
+### Thoracic Surgery
+- Thymectomy
+- Esophagectomy
+- Pneumonectomy
+- Lobectomy
+- Mediastinal Resection
+- Pulmonary Wedge Resection
+
+### General Surgery
+- Cholecystectomy
+- Nissen Fundoplication
+- Gastric Bypass
+- Gastrectomy
+- Colorectal procedures
+- Hemicolectomy
+- Sigmoidectomy
+- Adrenalectomy
+- Appendectomy
+- Bowel Resection
+
+### Urology
+- Prostatectomy
+- Nephrectomy
+- Partial-Nephrectomy
+- Cystectomy
+- Pelvic Lymphadenectomy
+- Pyeloplasty
+- Ureterectomy
+- Ureterolithotomy
+- Ureteral Implantation
+
+### Gynecology
+- Hysterectomy
+- Myomectomy
+- Endometriosis Resection
+- Pelvic Lymphadenectomy
+- Sacrocolpopexy
+- Salpingo-Oophorectomy
+- Tubal Reanastomosis
+- Tubal Ligation
+- Vaginal Prolapse Repair
+
+### Head and Neck
+- Radical Tonsillectomy
+- Tongue Base Resection
+- Hemi-Thyroidectomy
+- Total-Thyroidectomy
+- Supraglottic Laryngectomy
+- Neck Dissection
+
+---
+
+## TECHNICAL GLOSSARY
+
+### Abbreviations and Terms
+- 3D: 3 Dimensional
+- 2D: 2 Dimensional
+- MSRS: Mantra Surgical Robotic System
+- SCC: Surgeon Command Center
+- SHCD: Surgeon Hand Control Device
+- TI: Tool Interface
+- RCM: Remote Center of Motion
+- SCARA: Selective Compliance Articulated Robot Arm
+- MIS: Minimally Invasive Surgery
+- RAS: Robotic Assisted Surgery
+- RASE: Robotically Assisted Surgical Equipment
+- RASS: Robotically Assisted Surgical System
+- ESI: Endo-Surgical Instruments
+- DOF: Degree of Freedom
+- TECAB: Totally Endoscopic Coronary Artery Bypass
+- LIMA: Left Internal Mammary Artery
+- IPC: Industrial Personal Computer
+- RTOS: Real Time Operating System
+- EtherCAT: Ethernet for Control Automation Technology
+- DIO: Digital Input/Output
+- FPGA: Field Programmable Gate Array
+- GUI: Graphical User Interface
+- DICOM: Digital Imaging and Communications in Medicine
+- ESU: Electro-Surgical Unit
+- UPS: Uninterruptible Power Supply
+- HDVR: High Definition Video Recorder
+- CT: Computed Tomography
+- MRI: Magnetic Resonance Imaging
+- OR/OT: Operation Room/Operation Theatre
+
+### Motion Terms
+- Pitch: Motion about the lateral axis
+- Roll: Motion about the longitudinal axis
+- Yaw: Twisting or oscillation about the vertical axis
+- Gimbal: Device with mechanical members pivoted at right angles for keeping instruments horizontal
+
+### Robotics Terms
+- Actuator: Power mechanism to effect motion or maintain position, responds to control system signals
+- Arm: Interconnected set of links and powered joints for grasping/moving objects
+- Manipulator: Machine with series of segments for grasping and moving objects
+- Links: Physical or simulated segment of a kinematic chain
+- Gripper: Attachment to robot wrist for performing intended task
+- End Effector: Terminal device attached to robot arm
+
+---
+
+## PRODUCTS - ADDITIONAL DETAILS
+
+### MantrAsana (Tele-Surgeon Console - TSC)
+
+#### Overview
+- Full name: SSII MantrAsana
+- World's first portable tele-surgeon console
+- World's first fully integrated, ergonomic and portable telesurgery console for remote precision operations
+- Unveiled in November 2025
+
+#### Design & Form Factor
+- Compact self-contained chair-based version of larger SSi Mantra surgeon command center
+- Enables portability and requires less space
+- Facilitates telesurgery from wide range of settings including physician offices
+
+#### Technical Features
+- Magnetic sensor-based hand controls to control robotic system movements remotely
+- Very lightweight glasses providing magnified 3D view
+- 3D HD visualization system
+- Ergonomic design for extended surgical procedures
+
+#### Capabilities
+- Enables telesurgery from surgeon's office, home, or any remote location
+- Remote precision operations over long distances
+
+#### First Clinical Use
+- October 17, 2025: First successful telesurgery performed with MantrAsana
+- Dr. Sudhir Srivastava performed robotic-assisted coronary artery bypass from his residence in New Delhi, India
+- Patient located approximately 185 miles away at Manipal Hospital in Jaipur, India
+- Procedure completed successfully with no complications
+
+#### Availability
+- Commercial availability: December 2025 in India
+- Global rollout planned following India launch
+
+---
+
+### SSi Maya (XR-Based Surgical Training Platform)
+
+#### Type
+- XR-based (Extended Reality) Surgical Robotics Training and Patient Care Platform
+- Mixed-reality surgical training system
+
+#### Technology Foundation
+- Cutting-edge Web3-based technologies
+- 3D holographic visualization
+- AI-powered analysis
+
+#### Comprehensive Capabilities
+- 3D holographic DICOM imaging
+- Virtual User Guides
+- AI-based Anatomy Segmentation
+- Virtual Surgery simulation
+- Tele-proctoring support
+- Tele-surgery support
+- Procedure simulation
+- Full Mantra ecosystem integration
+
+#### Training Applications
+- Surgical training and simulation
+- Pre-operative planning
+- Anatomy visualization
+- Skill development for robotic surgery
+
+---
+
+### SSi Yantra (Surgical Multimedia Platform)
+
+#### Type
+- Surgical Multimedia Recording, Streaming and Tele-Mentoring Platform
+
+#### Core Features
+- 3D HD video recording capabilities
+- Live streaming of surgical procedures
+- Video storage and archival
+- Case review support
+
+#### Integration & Applications
+- Tele-mentoring platform for remote surgical guidance
+- Integrated with SSi Maya software for surgical training and simulation
+- Enables surgical education and skill transfer
+- Supports multi-specialty surgical documentation
+
+---
+
+### SSi Sutra (Robotic Surgery Program)
+
+#### Type
+- Comprehensive robotic surgery program and ecosystem
+
+#### Purpose
+- Supporting surgical tool suite
+- Complements the full Mantra ecosystem
+
+#### Target Audience
+- Surgeons
+- Surgical staff
+- Proctors
+- Hospitals
+- Clinical Engineers
+
+#### Foundation
+- Built around the state-of-the-art SSi Mantra surgical robotic system
+- Provides comprehensive support framework for robotic surgery implementation
+
+---
+
+## TELESURGERY BREAKTHROUGHS
+
+### Overall Achievement (Updated 2025)
+- 120+ successful telesurgeries completed (as of December 31, 2025)
+- Only surgical robotic company with regulatory approval for telesurgery and tele-proctoring from CDSCO
+
+### World's First Intercontinental Robotic Cardiac Telesurgery (July 19, 2025)
+- Date: July 19, 2025
+- Announced at: Society of Robotic Surgery (SRS) Annual Conference in Strasbourg, France
+- Distance: More than 4,000 miles (nearly 10,000 kilometres)
+- Route: IRCAD in Strasbourg, France to SAIMS in Indore, India
+- Locations: Institut de recherche contre les cancers de l'appareil digestif (IRCAD) Headquarters in Strasbourg to Sri Aurobindo Institute of Medical Sciences (SAIMS) and IRCAD National Centre in Indore
+
+#### Procedures Performed
+- Gastric bypass performed by Dr. Mohit Bhandari in just over 44 minutes
+- Robotic atrial septal defect closure surgery performed by Dr. Sudhir Srivastava
+- Zero complications reported
+
+#### Technical Performance
+- Imperceptible latency
+- Flawless precision
+- Seamless robotic control
+- No technical issues
+
+### First MantrAsana Telesurgery (October 17, 2025)
+- First surgery using portable tele-surgeon console
+- Dr. Sudhir Srivastava performed robotic-assisted coronary artery bypass
+- Remote location: Dr. Srivastava's residence in New Delhi, India
+- Operating room: Manipal Hospital in Jaipur, India
+- Distance: Approximately 185 miles
+
+### Additional Milestones
+- India's longest telesurgery: 2,362 km
+- World's first pediatric pyeloplasty telesurgery
+- Multiple remote cardiac telesurgeries over long distances
+- 400+ total cardiac procedures performed with SSi Mantra (as of December 2025)
+
+---
+
+## REGULATORY PROGRESS
+
+### India
+- CDSCO approval for telesurgery and tele-proctoring (approved)
+- First and only surgical robotic system with CDSCO approval for telesurgery
+- CDSCO: Central Drugs Standard Control Organization (India's equivalent of U.S. FDA)
+
+### USA
+- FDA 510(k) submission filed for SSi Mantra 3 (October 2025)
+- Multiple indications submitted
+- End of October 2025: Formal submission to Food and Drug Administration
+
+### Europe
+- CE Mark expected: First half (H1) of 2026
+- Anticipated approval for European market entry
+
+---
+
+## RECENT INNOVATIONS & DEVELOPMENTS (2025)
+
+### Mobile Tele-Surgical Unit (March 2025)
+- India's first mobile tele-surgical unit
+- Unveiled at Second Global Multi-Specialty Robotic Surgery Conference (SMRSC)
+- Location: Gurugram, Delhi National Capital Region (NCR), India
+- Date: March 7-9, 2025
+- Purpose: Improve remote surgical access and healthcare delivery
+
+### New 5-Millimeter Surgical Instruments (2025-2026)
+- Development completed for five new 5-millimeter surgical instruments
+- Target specialties: Pediatric, cardiac, and head & neck surgery
+- Addresses large underserved patient segments
+- Instruments: spatula cautery, hook cautery, needle driver, bipolar forceps, grasping forceps
+
+### Leadership Appointments (2026)
+- January 8, 2026: Milan Rao appointed as Global Chief Operating Officer and Chief Financial Officer
+
+---
+
+## FUTURE INNOVATIONS
+
+### Planned Technologies
+- Tele-ultrasound and biopsy integration for enhanced diagnostics
+- Voice-controlled endoscope assistant for laparoscopic procedures
+- Intraoperative AI assistant for decision support
+- Targeted ablative therapies for precision treatment
+- Automated surgical robots for procedural accuracy
+- Endoluminal microbots for ultra-minimally invasive interventions
+
+---
+
+## QUICK FACTS SUMMARY (Updated December 2025)
+
+### Company Statistics
+- 168 global installations (as of December 31, 2025)
+- 7,800+ robotic surgeries performed
+- 120+ telesurgeries completed
+- 400+ cardiac procedures performed
+- 1,400+ surgeons trained
+- 119 hospitals with installed systems
+- 75+ Indian cities
+- Zero device-related complications
+- Zero device-related adverse events
+- Less than one-third cost of competitors
+
+### Technology Leadership
+- 120+ successful telesurgeries
+- World's first portable tele-surgeon console (MantrAsana)
+- World's first intercontinental robotic cardiac telesurgery (July 2025)
+- Only system with regulatory approval for telesurgery (CDSCO)
+- 100+ validated procedure types
+- 40+ dedicated robotic instruments (30 currently available)
+- New 5mm instruments for pediatric and cardiac surgery
+- 32-inch 3D 4K visualization
+- Dual console system for telesurgery
+- 35-40 milliseconds latency for remote surgery
+
+### Global Impact
+- International presence: Indonesia, Philippines, Ecuador, Nepal, Guatemala, Colombia, Ukraine, France
+- 12 systems in 9 countries outside India
+- 8 medical specialties supported
+- World record holder: Robotic Beating Heart TECAB surgeries (1,300+ cases by Dr. Srivastava)
+- Pioneer: Intercontinental telesurgery (10,000 km, 4,000+ miles)
+- Public company on Nasdaq: SSII
+
+### Dr. Srivastava's Achievements
+- 1,300+ beating heart TECAB surgeries (world record)
+- Largest number of robotic cardiac procedures worldwide
+- World's first single, double, triple, and quadruple vessel beating heart TECAB procedures
+- First robotic beating heart TECAB via telesurgery

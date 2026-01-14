@@ -1,0 +1,72 @@
+version: '2.4'
+
+services:
+  g1_orchestrator:
+    image: g1_orchestrator:v2.9
+    container_name: g1_orchestrator
+    hostname: g1_orchestrator
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ros2 run g1_orchestrator g1_orchestrator_node
+
+  arm_controller:
+    image: g1_orchestrator:v2.9
+    container_name: arm_controller
+    hostname: arm_controller
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ros2 run arm_controller arm_controller_node
+
+  tts_audio_player:
+    image: g1_orchestrator:v2.9
+    container_name: tts_audio_player
+    hostname: tts_audio_player
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ros2 run audio_player tts_audio_player
+
+  audio_receiver:
+    image: g1_orchestrator:v2.9
+    container_name: audio_receiver
+    hostname: audio_receiver
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    ports:
+      - "5050:5050"
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python3 /ros2_ws/install/audio_player/lib/audio_player/audio_receiver.py

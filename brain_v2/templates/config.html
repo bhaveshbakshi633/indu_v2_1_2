@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BR_AI_N Voice Assistant - Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .header p {
+            font-size: 1em;
+            color: #7f8c8d;
+            font-weight: 400;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            background: white;
+            border: 1px solid #e1e8ed;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .column {
+            padding: 30px 25px;
+            border-right: 1px solid #e1e8ed;
+        }
+
+        .column:last-child {
+            border-right: none;
+        }
+
+        .column-header {
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .column-title {
+            font-size: 1.2em;
+            color: #2c3e50;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+            font-size: 0.9em;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group select,
+        .form-group input[type="text"],
+        .form-group input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 0.95em;
+            color: #2c3e50;
+            background: #ffffff;
+            transition: all 0.2s ease;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .form-group input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .range-value {
+            display: inline-block;
+            margin-left: 10px;
+            font-weight: 600;
+            color: #3498db;
+            font-size: 0.9em;
+        }
+
+        .backend-options {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+        }
+
+        .backend-options.active {
+            display: block;
+        }
+
+        .placeholder-message {
+            padding: 12px 15px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            color: #856404;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-calibrate {
+            background: #16a085;
+            color: white;
+        }
+
+        .btn-calibrate:hover {
+            background: #138d75;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .small-text {
+            font-size: 0.82em;
+            color: #95a5a6;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+
+        @media (max-width: 1400px) {
+            .config-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .column:nth-child(2) {
+                border-right: none;
+            }
+            .column:nth-child(3) {
+                border-right: 1px solid #e1e8ed;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 15px;
+            }
+
+            .header h1 {
+                font-size: 1.6em;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+            .column {
+                border-right: none;
+                border-bottom: 1px solid #e1e8ed;
+                padding: 20px 15px;
+            }
+            .column:last-child {
+                border-bottom: none;
+            }
+
+            .actions {
+                flex-direction: column;
+                gap: 12px;
+                padding: 0 15px;
+            }
+
+            .btn {
+                width: 100%;
+                padding: 14px 20px;
+                font-size: 0.95em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="/" style="text-decoration: none; color: #3498db; font-size: 24px; padding: 5px 10px; border: 2px solid #3498db; border-radius: 8px;">←</a>
+                <div>
+                    <h1>BR_AI_N Voice Assistant</h1>
+                    <p>Configuration Panel</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="config-grid">
+            <!-- Column 1: STT Settings -->
+            <div class="column">
+                <div class="column-header">
+                    <div class="column-title">1. Speech-to-Text</div>
+                    <div class="small-text" style="margin-top: 5px;">Input: You speak</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="stt-backend">STT Backend</label>
+                    <select id="stt-backend" onchange="updateSTTOptions()">
+                        <option value="google">Google Speech Recognition</option>
+                        <option value="whisper_server">Whisper Server (GPU)</option>
+                        <option value="whisper">Whisper (Offline/CPU)</option>
+                    </select>
+                </div>
+
+                <!-- Google STT Options -->
+                <div id="google-options" class="backend-options active">
+                    <div class="form-group">
+                        <label for="google-language">Language Code</label>
+                        <select id="google-language">
+                            <option value="en-US">English (US)</option>
+                            <option value="en-IN">English (India)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="hi-IN">Hindi (India)</option>
+                            <option value="es-ES">Spanish (Spain)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Whisper Server Options -->
+                <div id="whisper_server-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="whisper-server-host">Server Host</label>
+                        <input type="text" id="whisper-server-host" value="127.0.0.1" placeholder="IP or hostname">
+                    </div>
+                    <div class="form-group">
+                        <label for="whisper-server-port">Server Port</label>
+                        <input type="number" id="whisper-server-port" value="8001" min="1" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="whisper-server-model">Model Size</label>
+                        <select id="whisper-server-model">
+                            <option value="tiny">Tiny (fastest)</option>
+                            <option value="base">Base (balanced)</option>
+                            <option value="small">Small (better)</option>
+                            <option value="medium">Medium (high quality)</option>
+                            <option value="large">Large (best)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="whisper-server-language">Language</label>
+                        <select id="whisper-server-language">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Whisper Local Options -->
+                <div id="whisper-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="whisper-model">Model Size</label>
+                        <select id="whisper-model">
+                            <option value="tiny">Tiny (fastest)</option>
+                            <option value="base">Base (balanced)</option>
+                            <option value="small">Small (better)</option>
+                            <option value="medium">Medium (high quality)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="whisper-language">Language</label>
+                        <select id="whisper-language">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 2: LLM Settings -->
+            <div class="column">
+                <div class="column-header">
+                    <div class="column-title">2. Language Model</div>
+                    <div class="small-text" style="margin-top: 5px;">Processing: AI thinks</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="llm-model">Model Name</label>
+                    <select id="llm-model">
+                        <option value="INDU:latest">INDU:latest</option>
+                    </select>
+                    <div class="small-text">Loading models from Ollama server...</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="llm-host">Ollama Host</label>
+                    <input type="text" id="llm-host" value="172.16.6.19" placeholder="IP or hostname">
+                </div>
+
+                <div class="form-group">
+                    <label for="llm-port">Ollama Port</label>
+                    <input type="number" id="llm-port" value="11434" min="1" max="65535">
+                </div>
+
+                <div class="form-group">
+                    <label for="llm-temperature">Temperature: <span id="temperature-value">0.2</span></label>
+                    <input type="range" id="llm-temperature" min="0" max="1" step="0.1" value="0.2"
+                           oninput="document.getElementById('temperature-value').textContent = this.value">
+                    <div class="small-text">Lower = focused, Higher = creative</div>
+                </div>
+            </div>
+
+            <!-- Column 3: TTS Settings -->
+            <div class="column">
+                <div class="column-header">
+                    <div class="column-title">3. Text-to-Speech</div>
+                    <div class="small-text" style="margin-top: 5px;">Output: AI speaks</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tts-backend">TTS Backend</label>
+                    <select id="tts-backend" onchange="updateTTSOptions()">
+                        <option value="edge">Edge TTS (Microsoft)</option>
+                        <option value="gtts">Google TTS (gTTS)</option>
+                        <option value="pyttsx3">pyttsx3 (Offline)</option>
+                        <option value="vibevoice">VibeVoice (Local Server)</option>
+                        <option value="chatterbox">Chatterbox (Local Server)</option>
+                    </select>
+                </div>
+
+                <!-- Edge TTS Options -->
+                <div id="edge-options" class="backend-options active">
+                    <div class="form-group">
+                        <label for="edge-language-filter">Filter by Language</label>
+                        <select id="edge-language-filter" onchange="filterEdgeVoices()">
+                            <option value="">All Languages</option>
+                            <option value="hi-IN">Hindi (India)</option>
+                            <option value="en-IN">English (India)</option>
+                            <option value="ta-IN">Tamil (India)</option>
+                            <option value="te-IN">Telugu (India)</option>
+                            <option value="kn-IN">Kannada (India)</option>
+                            <option value="ml-IN">Malayalam (India)</option>
+                            <option value="bn-IN">Bengali (India)</option>
+                            <option value="mr-IN">Marathi (India)</option>
+                            <option value="gu-IN">Gujarati (India)</option>
+                            <option value="en-US">English (US)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="zh-CN">Chinese (Simplified)</option>
+                            <option value="ja-JP">Japanese</option>
+                            <option value="ko-KR">Korean</option>
+                            <option value="es-ES">Spanish (Spain)</option>
+                            <option value="fr-FR">French (France)</option>
+                            <option value="de-DE">German (Germany)</option>
+                        </select>
+                        <div class="small-text">Select a language to filter voices</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edge-voice">Voice</label>
+                        <select id="edge-voice">
+                            <option value="en-IN-NeerjaExpressiveNeural">en-IN-NeerjaExpressiveNeural</option>
+                        </select>
+                        <div class="small-text" id="edge-voice-status">Loading available voices...</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edge-rate">Speech Rate: <span class="range-value" id="edge-rate-value">+0%</span></label>
+                        <input type="text" id="edge-rate" value="+0%" placeholder="e.g., +0%, +20%, -10%">
+                    </div>
+                </div>
+
+                <!-- Google TTS Options -->
+                <div id="gtts-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="gtts-language">Language Code</label>
+                        <select id="gtts-language">
+                            <option value="en">English</option>
+                            <option value="hi">Hindi</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="gtts-tld">Top Level Domain</label>
+                        <select id="gtts-tld">
+                            <option value="co.in">co.in (India)</option>
+                            <option value="com">com (US)</option>
+                            <option value="co.uk">co.uk (UK)</option>
+                            <option value="com.au">com.au (Australia)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- pyttsx3 Options -->
+                <div id="pyttsx3-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="pyttsx3-rate">Speech Rate (words/min)</label>
+                        <input type="number" id="pyttsx3-rate" value="150" min="50" max="300">
+                    </div>
+                    <div class="form-group">
+                        <label for="pyttsx3-volume">Volume: <span class="range-value" id="pyttsx3-volume-value">1.0</span></label>
+                        <input type="range" id="pyttsx3-volume" min="0" max="1" step="0.1" value="1.0" oninput="document.getElementById('pyttsx3-volume-value').textContent = this.value">
+                    </div>
+                </div>
+
+                <!-- VibeVoice Options -->
+                <div id="vibevoice-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="vibevoice-host">Server Host</label>
+                        <input type="text" id="vibevoice-host" value="localhost" placeholder="IP or hostname">
+                        <div class="small-text">VibeVoice server IP address</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vibevoice-port">Server Port</label>
+                        <input type="number" id="vibevoice-port" value="8787" min="1" max="65535">
+                        <div class="small-text">VibeVoice server port (default: 8787)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vibevoice-voice">Voice</label>
+                        <input type="text" id="vibevoice-voice" value="hi-Aish_woman" placeholder="Voice name">
+                        <div class="small-text">Voice name from VibeVoice server (e.g., hi-Aish_woman)</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vibevoice-seed">Seed (Reproducibility)</label>
+                        <input type="number" id="vibevoice-seed" value="42" min="0" max="999999">
+                        <div class="small-text">Random seed for reproducible speech generation</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="vibevoice-cfg-scale">CFG Scale: <span class="range-value" id="vibevoice-cfg-value">1.3</span></label>
+                        <input type="range" id="vibevoice-cfg-scale" min="1.0" max="2.0" step="0.1" value="1.3" oninput="document.getElementById('vibevoice-cfg-value').textContent = this.value">
+                        <div class="small-text">Higher = more expressive (1.0-2.0)</div>
+                    </div>
+                </div>
+
+                <!-- Chatterbox Options -->
+                <div id="chatterbox-options" class="backend-options">
+                    <div class="form-group">
+                        <label for="chatterbox-host">Server Host</label>
+                        <input type="text" id="chatterbox-host" value="172.16.6.19" placeholder="IP or hostname">
+                        <div class="small-text">Chatterbox TTS server IP address</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="chatterbox-port">Server Port</label>
+                        <input type="number" id="chatterbox-port" value="8000" min="1" max="65535">
+                        <div class="small-text">Chatterbox server port (default: 8000)</div>
+                    </div>
+                </div>
+
+                <!-- Assistant Settings (under TTS) -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e1e8ed;">
+                    <div style="font-weight: 600; color: #34495e; margin-bottom: 15px;">Assistant Settings</div>
+                    <div class="form-group">
+                        <label for="max-messages">Max Conversation Messages</label>
+                        <input type="number" id="max-messages" value="10" min="1" max="100">
+                        <div class="small-text">Maximum messages to keep in conversation history</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="chunk-first">First TTS Chunk Size (characters)</label>
+                        <input type="number" id="chunk-first" value="50" min="10" max="500">
+                        <div class="small-text">Smaller first chunk for faster initial response</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="chunk-rest">Remaining Chunks Size (characters)</label>
+                        <input type="number" id="chunk-rest" value="150" min="50" max="1000">
+                        <div class="small-text">Size for subsequent audio chunks</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Column 4: Web UI -->
+            <div class="column">
+                <div class="column-header">
+                    <div class="column-title">4. Web UI</div>
+                    <div class="small-text" style="margin-top: 5px;">Configuration: Interface</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="config-port">Config Server Port</label>
+                    <input type="number" id="config-port" value="8080" min="1024" max="65535">
+                    <div class="small-text">Port for this configuration interface (requires restart)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+            <button class="btn btn-secondary" onclick="resetConfig()">Reset to Defaults</button>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // Load configuration on page load
+        window.onload = function() {
+            loadConfig();
+            loadEdgeVoices();
+            loadOllamaModels();
+        };
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const config = data.config;
+
+                    // TTS Settings
+                    document.getElementById('tts-backend').value = config.tts.backend;
+                    document.getElementById('edge-voice').value = config.tts.edge.voice;
+                    document.getElementById('edge-rate').value = config.tts.edge.rate;
+                    document.getElementById('gtts-language').value = config.tts.gtts.language;
+                    document.getElementById('gtts-tld').value = config.tts.gtts.tld;
+                    document.getElementById('pyttsx3-rate').value = config.tts.pyttsx3.rate;
+                    document.getElementById('pyttsx3-volume').value = config.tts.pyttsx3.volume;
+                    document.getElementById('pyttsx3-volume-value').textContent = config.tts.pyttsx3.volume;
+
+                    // VibeVoice settings
+                    if (config.tts.vibevoice) {
+                        document.getElementById('vibevoice-host').value = config.tts.vibevoice.host || 'localhost';
+                        document.getElementById('vibevoice-port').value = config.tts.vibevoice.port || 8787;
+                        document.getElementById('vibevoice-voice').value = config.tts.vibevoice.voice || 'hi-Aish_woman';
+                        document.getElementById('vibevoice-seed').value = config.tts.vibevoice.seed || 42;
+                        document.getElementById('vibevoice-cfg-scale').value = config.tts.vibevoice.cfg_scale || 1.3;
+                        document.getElementById('vibevoice-cfg-value').textContent = config.tts.vibevoice.cfg_scale || 1.3;
+                    }
+
+                    // Chatterbox settings
+                    if (config.tts.chatterbox) {
+                        document.getElementById('chatterbox-host').value = config.tts.chatterbox.host || '172.16.6.19';
+                        document.getElementById('chatterbox-port').value = config.tts.chatterbox.port || 8000;
+                    }
+
+                    // STT Settings
+                    document.getElementById('stt-backend').value = config.stt.backend || 'google';
+                    document.getElementById('google-language').value = config.stt.google?.language || 'en-US';
+                    // Whisper Server settings
+                    if (config.stt.whisper_server) {
+                        document.getElementById('whisper-server-host').value = config.stt.whisper_server.host || '127.0.0.1';
+                        document.getElementById('whisper-server-port').value = config.stt.whisper_server.port || 8001;
+                        document.getElementById('whisper-server-model').value = config.stt.whisper_server.model || 'medium';
+                        document.getElementById('whisper-server-language').value = config.stt.whisper_server.language || 'en';
+                    }
+                    // Local Whisper settings
+                    document.getElementById('whisper-model').value = config.stt.whisper?.model_size || 'base';
+                    document.getElementById('whisper-language').value = config.stt.whisper?.language || 'en';
+
+                    // LLM Settings
+                    document.getElementById('llm-model').value = config.llm.model || 'INDU:latest';
+                    // Use local host/port from config
+                    const llmHost = config.llm.local?.host || config.llm.host || '127.0.0.1';
+                    const llmPort = config.llm.local?.port || config.llm.port || 11434;
+                    document.getElementById('llm-host').value = llmHost;
+                    document.getElementById('llm-port').value = llmPort;
+
+                    // Temperature
+                    const temperature = config.llm.options?.temperature || 0.2;
+                    document.getElementById('llm-temperature').value = temperature;
+                    document.getElementById('temperature-value').textContent = temperature;
+
+                    // Assistant Settings
+                    document.getElementById('max-messages').value = config.assistant.max_messages;
+                    document.getElementById('chunk-first').value = config.assistant.chunk_size_first;
+                    document.getElementById('chunk-rest').value = config.assistant.chunk_size_rest;
+
+                    // Config Server
+                    document.getElementById('config-port').value = config.web_config.port;
+
+                    updateTTSOptions();
+                    updateSTTOptions();
+                }
+            } catch (error) {
+                showStatus('Error loading configuration: ' + error.message, 'error');
+            }
+        }
+
+        async function loadEdgeVoices(languageFilter = '') {
+            try {
+                // Build URL with optional filter parameter
+                const url = languageFilter
+                    ? `/api/voices/edge?lang=${encodeURIComponent(languageFilter)}`
+                    : '/api/voices/edge';
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const select = document.getElementById('edge-voice');
+                    const currentValue = select.value;
+                    select.innerHTML = '';
+
+                    // Add voices to dropdown
+                    data.voices.forEach(voice => {
+                        const option = document.createElement('option');
+                        option.value = voice.name;
+                        option.textContent = `${voice.name} (${voice.language}, ${voice.gender})`;
+                        select.appendChild(option);
+                    });
+
+                    // Try to restore previous selection
+                    if (currentValue && data.voices.find(v => v.name === currentValue)) {
+                        select.value = currentValue;
+                    }
+
+                    // Update status message
+                    const statusText = languageFilter
+                        ? `${data.count} ${languageFilter} voices available`
+                        : `${data.count} voices available`;
+                    document.getElementById('edge-voice-status').textContent = statusText;
+                }
+            } catch (error) {
+                console.error('Error loading Edge voices:', error);
+                document.getElementById('edge-voice-status').textContent = 'Error loading voices';
+            }
+        }
+
+        function filterEdgeVoices() {
+            const filter = document.getElementById('edge-language-filter').value;
+            loadEdgeVoices(filter);
+        }
+
+        async function loadOllamaModels() {
+            try {
+                const response = await fetch('/api/models/ollama');
+                const data = await response.json();
+
+                if (data.status === 'success' && data.models && data.models.length > 0) {
+                    const select = document.getElementById('llm-model');
+                    const currentValue = select.value;
+                    select.innerHTML = '';
+
+                    data.models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        select.appendChild(option);
+                    });
+
+                    // Restore current value, or use first model if current not in list
+                    if (currentValue && data.models.includes(currentValue)) {
+                        select.value = currentValue;
+                    } else if (data.models.includes('llama3.1:8b')) {
+                        select.value = 'llama3.1:8b';  // Preferred default
+                    } else {
+                        select.value = data.models[0];  // Fallback to first available
+                    }
+                    document.querySelector('#llm-model + .small-text').textContent = `${data.count} models available`;
+                } else {
+                    document.querySelector('#llm-model + .small-text').textContent = 'Could not connect to Ollama server';
+                }
+            } catch (error) {
+                console.error('Error loading Ollama models:', error);
+                document.querySelector('#llm-model + .small-text').textContent = 'Error loading models';
+            }
+        }
+
+        function updateTTSOptions() {
+            const backend = document.getElementById('tts-backend').value;
+            document.querySelectorAll('.backend-options').forEach(el => {
+                if (el.parentElement.querySelector('#tts-backend')) {
+                    el.classList.remove('active');
+                }
+            });
+            document.getElementById(backend + '-options').classList.add('active');
+        }
+
+        function updateSTTOptions() {
+            const backend = document.getElementById('stt-backend').value;
+            const googleOptions = document.getElementById('google-options');
+            const whisperServerOptions = document.getElementById('whisper_server-options');
+            const whisperOptions = document.getElementById('whisper-options');
+
+            googleOptions.classList.remove('active');
+            whisperServerOptions.classList.remove('active');
+            whisperOptions.classList.remove('active');
+
+            if (backend === 'google') {
+                googleOptions.classList.add('active');
+            } else if (backend === 'whisper_server') {
+                whisperServerOptions.classList.add('active');
+            } else {
+                whisperOptions.classList.add('active');
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                // Validate required fields
+                const llmModel = document.getElementById('llm-model').value;
+                if (!llmModel || llmModel.trim() === '') {
+                    alert('Error: LLM Model name cannot be empty. Please select a model.');
+                    return;
+                }
+
+                const config = {
+                    tts: {
+                        backend: document.getElementById('tts-backend').value,
+                        edge: {
+                            voice: document.getElementById('edge-voice').value,
+                            rate: document.getElementById('edge-rate').value,
+                            pitch: "+0Hz"
+                        },
+                        gtts: {
+                            language: document.getElementById('gtts-language').value,
+                            tld: document.getElementById('gtts-tld').value
+                        },
+                        pyttsx3: {
+                            rate: parseInt(document.getElementById('pyttsx3-rate').value),
+                            volume: parseFloat(document.getElementById('pyttsx3-volume').value)
+                        },
+                        vibevoice: {
+                            host: document.getElementById('vibevoice-host').value,
+                            port: parseInt(document.getElementById('vibevoice-port').value),
+                            voice: document.getElementById('vibevoice-voice').value,
+                            seed: parseInt(document.getElementById('vibevoice-seed').value),
+                            cfg_scale: parseFloat(document.getElementById('vibevoice-cfg-scale').value)
+                        },
+                        chatterbox: {
+                            host: document.getElementById('chatterbox-host').value,
+                            port: parseInt(document.getElementById('chatterbox-port').value)
+                        }
+                    },
+                    stt: {
+                        backend: document.getElementById('stt-backend').value,
+                        google: {
+                            language: document.getElementById('google-language').value
+                        },
+                        whisper_server: {
+                            host: document.getElementById('whisper-server-host').value,
+                            port: parseInt(document.getElementById('whisper-server-port').value),
+                            model: document.getElementById('whisper-server-model').value,
+                            language: document.getElementById('whisper-server-language').value
+                        },
+                        whisper: {
+                            model_size: document.getElementById('whisper-model').value,
+                            language: document.getElementById('whisper-language').value
+                        }
+                    },
+                    llm: {
+                        deployment_mode: 'local',
+                        model: document.getElementById('llm-model').value,
+                        local: {
+                            host: document.getElementById('llm-host').value,
+                            port: parseInt(document.getElementById('llm-port').value)
+                        },
+                        options: {
+                            temperature: parseFloat(document.getElementById('llm-temperature').value)
+                        }
+                    },
+                    assistant: {
+                        max_messages: parseInt(document.getElementById('max-messages').value),
+                        chunk_size_first: parseInt(document.getElementById('chunk-first').value),
+                        chunk_size_rest: parseInt(document.getElementById('chunk-rest').value)
+                    },
+                    web_config: {
+                        enabled: true,
+                        host: "127.0.0.1",
+                        port: parseInt(document.getElementById('config-port').value)
+                    },
+                    web_interface: {
+                        enabled: false,
+                        message: "Not Available - Placeholder"
+                    }
+                };
+
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    showStatus('Configuration saved successfully! Please restart the assistant to apply changes.', 'success');
+                } else {
+                    showStatus('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error saving configuration: ' + error.message, 'error');
+            }
+        }
+
+        function resetConfig() {
+            if (confirm('Reset all settings to defaults?')) {
+                loadConfig();
+                showStatus('Settings reset. Click "Save Configuration" to apply.', 'success');
+            }
+        }
+
+        async function triggerCalibration() {
+            if (confirm('Run audio calibration?\n\nYou will hear a test beep. Make sure your speakers and microphone are on.')) {
+                try {
+                    showStatus('Calibrating... Please wait, you will hear a test beep.', 'success');
+
+                    const response = await fetch('/api/calibrate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        showStatus(data.message, 'success');
+                    } else {
+                        showStatus('Calibration failed: ' + data.error, 'error');
+                    }
+                } catch (error) {
+                    showStatus('Error during calibration: ' + error.message, 'error');
+                }
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
