@@ -1,7 +1,7 @@
 # G1 Orchestrator Docker - C++ ROS2
 # ==================================
 # Base: ROS2 Humble on Ubuntu 22.04 (ARM64)
-# Includes: orchestrator, arm_controller, audio_player
+# Includes: orchestrator, arm_controller, audio_player, health_check
 
 FROM ros:humble-ros-base-jammy
 
@@ -25,10 +25,19 @@ RUN apt-get update && apt-get install -y \
     net-tools \
     iputils-ping \
     python3-pip \
+    libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Flask for audio_receiver HTTP endpoint
-RUN pip3 install flask
+# Python packages for audio and health check
+RUN pip3 install \
+    flask \
+    edge-tts \
+    paramiko \
+    pyyaml \
+    soundfile \
+    scipy \
+    requests \
+    numpy
 
 # ============================================
 # ROS2 Workspace

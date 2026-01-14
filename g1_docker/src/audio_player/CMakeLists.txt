@@ -45,6 +45,9 @@ ament_python_install_package(${PROJECT_NAME})
 
 install(PROGRAMS
   scripts/audio_receiver.py
+  scripts/announcer_utils.py
+  scripts/startup_health_check.py
+  scripts/status_announcer.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

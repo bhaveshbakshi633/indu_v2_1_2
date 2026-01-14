@@ -1,44 +1,11 @@
 version: '2.4'
 
 services:
-  g1_orchestrator:
-    image: g1_orchestrator:v2.9
-    container_name: g1_orchestrator
-    hostname: g1_orchestrator
-    network_mode: host
-    privileged: true
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-    volumes:
-      - ./config:/ros2_ws/config:ro
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: ros2 run g1_orchestrator g1_orchestrator_node
-
-  arm_controller:
-    image: g1_orchestrator:v2.9
-    container_name: arm_controller
-    hostname: arm_controller
-    network_mode: host
-    privileged: true
-    environment:
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-    volumes:
-      - ./config:/ros2_ws/config:ro
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: ros2 run arm_controller arm_controller_node
-
+  # ============================================================
+  # AUDIO SERVICES - Start FIRST (no dependencies)
+  # ============================================================
   tts_audio_player:
-    image: g1_orchestrator:v2.9
+    image: g1_orchestrator:v2.11
     container_name: tts_audio_player
     hostname: tts_audio_player
     network_mode: host
@@ -54,15 +21,13 @@ services:
     command: ros2 run audio_player tts_audio_player
 
   audio_receiver:
-    image: g1_orchestrator:v2.9
+    image: g1_orchestrator:v2.11
     container_name: audio_receiver
     hostname: audio_receiver
     network_mode: host
     privileged: true
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-    ports:
-      - "5050:5050"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -70,3 +35,110 @@ services:
         max-size: "10m"
         max-file: "3"
     command: python3 /ros2_ws/install/audio_player/lib/audio_player/audio_receiver.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5050/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # ============================================================
+  # STARTUP HEALTH CHECK - Runs AFTER audio_receiver is healthy
+  # Internally waits for tts_audio_player ROS topics
+  # Creates /tmp/startup_complete when all external services OK
+  # ============================================================
+  startup_health_check:
+    image: g1_orchestrator:v2.11
+    container_name: startup_health_check
+    hostname: startup_health_check
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    depends_on:
+      audio_receiver:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python3 /ros2_ws/install/audio_player/lib/audio_player/startup_health_check.py
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/startup_complete"]
+      interval: 3s
+      timeout: 2s
+      retries: 60
+      start_period: 10s
+
+  # ============================================================
+  # MAIN SERVICES - Start AFTER health check is healthy
+  # ============================================================
+  g1_orchestrator:
+    image: g1_orchestrator:v2.11
+    container_name: g1_orchestrator
+    hostname: g1_orchestrator
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ros2 run g1_orchestrator g1_orchestrator_node
+
+  arm_controller:
+    image: g1_orchestrator:v2.11
+    container_name: arm_controller
+    hostname: arm_controller
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ros2 run arm_controller arm_controller_node
+
+  # ============================================================
+  # STATUS ANNOUNCER - Continuous monitoring after startup
+  # ============================================================
+  status_announcer:
+    image: g1_orchestrator:v2.11
+    container_name: status_announcer
+    hostname: status_announcer
+    network_mode: host
+    privileged: true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./config:/ros2_ws/config:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python3 /ros2_ws/install/audio_player/lib/audio_player/status_announcer.py
