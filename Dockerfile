@@ -37,7 +37,7 @@ RUN pip3 install \
     soundfile \
     scipy \
     requests \
-    numpy
+    numpy opencv-python-headless
 
 # ============================================
 # ROS2 Workspace

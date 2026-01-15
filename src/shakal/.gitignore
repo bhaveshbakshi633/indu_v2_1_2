@@ -1,0 +1,26 @@
+# Build
+build/
+cmake-build-*/
+
+# Models (binary, large files)
+models/*.onnx
+models/*.engine
+
+# Data
+data/embeddings/*.bin
+data/faces/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Compiled
+*.o
+*.a
+*.so
+
+# OS
+.DS_Store
+Thumbs.db

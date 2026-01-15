@@ -1,0 +1,45 @@
+camera:
+  device_id: 6
+  width: 1280
+  height: 720
+  fps: 30
+  use_gstreamer: false
+
+models:
+  detection:
+    path: "../models/face_detection.onnx"
+    input_size: [320, 320]
+    confidence_threshold: 0.6
+    nms_threshold: 0.3
+
+  recognition:
+    path: "../models/face_recognition.onnx"
+    input_size: [112, 112]
+    embedding_size: 512
+
+database:
+  faces_dir: "../data/faces"
+  embeddings_dir: "../data/embeddings"
+  embeddings_file: "../data/embeddings/database.bin"
+
+recognition:
+  similarity_threshold: 0.6
+  unknown_label: "Unknown"
+
+antispoof:
+  enabled: false
+  path: "../models/anti_spoof.onnx"
+  threshold: 0.5
+
+gpu:
+  enabled: true
+  device_id: 0
+  tensorrt:
+    enabled: false
+    fp16: true
+
+display:
+  show_fps: true
+  show_bbox: true
+  show_landmarks: false
+  window_name: "Shakal"

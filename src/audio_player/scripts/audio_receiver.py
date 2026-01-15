@@ -241,3 +241,76 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+# ============================================
+# Camera Feed Endpoint (MJPEG streaming)
+# ============================================
+import cv2
+from flask import Response
+
+camera_lock = threading.Lock()
+camera_capture = None
+
+def get_camera():
+    """Camera capture object get karo (singleton)"""
+    global camera_capture
+    with camera_lock:
+        if camera_capture is None or not camera_capture.isOpened():
+            # OBSBOT Tiny 2 on /dev/video6
+            camera_capture = cv2.VideoCapture(6)
+            camera_capture.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
+            camera_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            camera_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            camera_capture.set(cv2.CAP_PROP_FPS, 30)
+        return camera_capture
+
+def generate_frames():
+    """MJPEG frames generate karo"""
+    while True:
+        try:
+            cap = get_camera()
+            if cap is None or not cap.isOpened():
+                time.sleep(0.1)
+                continue
+                
+            ret, frame = cap.read()
+            if not ret:
+                time.sleep(0.1)
+                continue
+            
+            # JPEG encode karo
+            _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + 
+                   jpeg.tobytes() + b'\r\n')
+                   
+        except Exception as e:
+            print(f"Camera error: {e}")
+            time.sleep(0.5)
+
+@app.route('/camera/feed')
+def camera_feed():
+    """Live MJPEG stream endpoint"""
+    return Response(
+        generate_frames(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+@app.route('/camera/snapshot')
+def camera_snapshot():
+    """Single frame snapshot"""
+    try:
+        cap = get_camera()
+        if cap is None or not cap.isOpened():
+            return jsonify({"error": "Camera not available"}), 503
+            
+        ret, frame = cap.read()
+        if not ret:
+            return jsonify({"error": "Failed to capture frame"}), 500
+        
+        _, jpeg = cv2.imencode('.jpg', frame)
+        return Response(jpeg.tobytes(), mimetype='image/jpeg')
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

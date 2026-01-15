@@ -1,0 +1,50 @@
+# Shakal Face Recognition - Jetson L4T R35
+# =========================================
+# Base: dustynv/opencv:4.8.1-r35.4.1 (OpenCV with CUDA pre-built)
+
+FROM dustynv/opencv:4.8.1-r35.4.1
+
+LABEL maintainer="SSI" \
+      description="Shakal - Real-time Face Recognition with CUDA"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ============================================
+# Dependencies
+# ============================================
+RUN apt-get update && apt-get install -y \
+    cmake \
+    build-essential \
+    libyaml-cpp-dev \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install flask requests
+
+# ============================================
+# Copy Shakal source
+# ============================================
+WORKDIR /shakal
+COPY src/shakal/CMakeLists.txt /shakal/
+COPY src/shakal/src /shakal/src/
+COPY src/shakal/config /shakal/config/
+COPY src/shakal/models /shakal/models/
+COPY src/shakal/data /shakal/data/
+COPY src/shakal/tools /shakal/tools/
+COPY src/shakal/libdev_v2_1_0_7 /shakal/libdev_v2_1_0_7/
+
+# Copy Bridge
+COPY src/shakal_bridge/shakal_bridge.py /shakal/bridge/shakal_bridge.py
+
+# ============================================
+# Build with CUDA
+# ============================================
+RUN mkdir -p build && cd build && \
+    cmake .. -DUSE_CUDA=ON -DOpenCV_DIR=/usr/local/lib/cmake/opencv4 && \
+    make -j$(nproc)
+
+# ============================================
+# Run Bridge (which runs Shakal internally)
+# ============================================
+WORKDIR /shakal/bridge
+CMD ["python3", "shakal_bridge.py"]

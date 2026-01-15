@@ -148,3 +148,35 @@ services:
         max-size: "10m"
         max-file: "3"
     command: python3 /ros2_ws/install/audio_player/lib/audio_player/status_announcer.py
+
+  # ============================================================
+  # SHAKAL - Face Recognition with CUDA
+  # ============================================================
+  shakal:
+    build:
+      context: .
+      dockerfile: Dockerfile.shakal
+    image: shakal:latest
+    container_name: shakal
+    hostname: shakal
+    network_mode: host
+    privileged: true
+    runtime: nvidia
+    devices:
+      - /dev/video6:/dev/video6
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - ./src/shakal/data:/shakal/data
+      - ./src/shakal/config:/shakal/config:ro
+      - ./src/shakal/models:/shakal/models:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
