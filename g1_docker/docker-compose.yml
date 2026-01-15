@@ -55,7 +55,10 @@ services:
     privileged: true
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - GAIN=${GAIN:-0.5}
     volumes:
+      - ./src/audio_player/scripts/startup_health_check.py:/ros2_ws/install/audio_player/lib/audio_player/startup_health_check.py:ro
+      - ./src/audio_player/scripts/announcer_utils.py:/ros2_ws/install/audio_player/lib/audio_player/announcer_utils.py:ro
       - ./config:/ros2_ws/config:ro
     depends_on:
       audio_receiver:
@@ -106,6 +109,7 @@ services:
     privileged: true
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - GAIN=${GAIN:-0.5}
     volumes:
       - ./config:/ros2_ws/config:ro
     depends_on:
@@ -130,7 +134,9 @@ services:
     privileged: true
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - GAIN=${GAIN:-0.5}
     volumes:
+      - ./src/audio_player/scripts/announcer_utils.py:/ros2_ws/install/audio_player/lib/audio_player/announcer_utils.py:ro
       - ./config:/ros2_ws/config:ro
     depends_on:
       startup_health_check:

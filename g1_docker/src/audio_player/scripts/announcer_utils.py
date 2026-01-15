@@ -259,13 +259,18 @@ class AnnouncerTTS:
 # Global announcer instance
 _announcer = None
 
-def get_announcer(chatterbox_host='192.168.123.169', chatterbox_port=8000):
+def get_announcer(chatterbox_host='192.168.123.169', chatterbox_port=8000, gain=None):
     """Get or create global announcer instance"""
     global _announcer
     if _announcer is None:
+        # Environment variable se gain lo, default 0.5
+        if gain is None:
+            gain = float(os.environ.get('GAIN', '0.5'))
+            gain = max(0.1, min(6.0, gain))
         _announcer = AnnouncerTTS(
             chatterbox_host=chatterbox_host,
-            chatterbox_port=chatterbox_port
+            chatterbox_port=chatterbox_port,
+            gain=gain
         )
     return _announcer
 

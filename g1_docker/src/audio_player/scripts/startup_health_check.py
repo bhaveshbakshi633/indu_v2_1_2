@@ -96,10 +96,12 @@ class StartupHealthCheck:
         endpoint = service_config.get('health_endpoint', '/health')
         name = service_config.get('name', service_name)
         
-        url = f"http://{host}:{port}{endpoint}"
+        protocol = service_config.get("protocol", "http")
+        verify_ssl = service_config.get("verify_ssl", True)
+        url = f"{protocol}://{host}:{port}{endpoint}"
         
         try:
-            resp = requests.get(url, timeout=5)
+            resp = requests.get(url, timeout=5, verify=verify_ssl)
             if resp.status_code == 200:
                 return True
         except Exception as e:
@@ -232,19 +234,19 @@ class StartupHealthCheck:
             self._announce(announcements.get('system_ready', 'System startup complete. Ready for operation.'))
             
             logger.info("="*50)
-            logger.info("STARTUP HEALTH CHECK COMPLETE")
+            logger.info("STARTUP HEALTH CHECK COMPLETE - Going silent")
             logger.info("="*50)
             
-            # Stay running so docker-compose healthcheck can verify
-            logger.info("Staying alive for healthcheck...")
+            # Silent loop - only errors will be logged from here
             while True:
-                time.sleep(60)
+                time.sleep(3600)  # Sleep for 1 hour, no logging
         else:
             logger.error("Some services failed to start!")
+            logger.error("Health check FAILED - container staying unhealthy")
             # Don't create marker - healthcheck will fail
-            # Stay running but unhealthy
+            # Stay running but unhealthy, no more logging
             while True:
-                time.sleep(60)
+                time.sleep(3600)
 
 if __name__ == '__main__':
     checker = StartupHealthCheck()

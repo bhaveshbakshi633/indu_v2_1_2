@@ -33,6 +33,18 @@ services:
       password: "Ssi@113322"
       start_cmd: "nohup ollama serve > /tmp/ollama.log 2>&1 &"
 
+  brain_v2:
+    name: "Voice Assistant"
+    host: "192.168.123.169"
+    port: 8080
+    protocol: "https"
+    verify_ssl: false
+    health_endpoint: "/api/health"
+    ssh:
+      user: "ssi"
+      password: "Ssi@113322"
+      start_cmd: "cd ~/Downloads/indu_brain_v2_1_1 && nohup python3 server.py > /tmp/brain_v2.log 2>&1 &"
+
 announcements:
   checking: "Checking external servers"
   server_ok: "{name} server running"
