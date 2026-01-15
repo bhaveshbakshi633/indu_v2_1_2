@@ -132,6 +132,64 @@ docker restart startup_health_check
 
 # Stop all
 sudo docker-compose down
+
+---
+
+## Arm Control Commands
+
+### Command Pattern (G1 par run karo)
+```bash
+docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash && ros2 topic pub --once /arm_ctrl/command std_msgs/msg/String "{data: \"COMMAND\"}"'
+```
+
+### Basic Commands
+
+| Command | Description |
+|---------|-------------|
+| `init_arms` | Arms initialize karo |
+| `move_home` | Home position pe bhejo |
+| `reset_safety` | Safety error clear karo |
+
+### Teach Mode Commands
+
+| Command | Description |
+|---------|-------------|
+| `enter_teach` | Teach/compliance mode enable karo (arms freely move) |
+| `start_recording` | Trajectory recording shuru karo |
+| `stop_recording` | Recording band karo aur save karo |
+| `exit_teach` | Teach mode se exit karo |
+| `play` | Last recorded trajectory playback karo |
+
+### Policy Command (Direct Joint Control)
+```bash
+# Dono arms ko specific position pe bhejo
+# Format: policy:{"left":[7 joints], "right":[7 joints]}
+docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash && ros2 topic pub --once /arm_ctrl/command std_msgs/msg/String "{data: \"policy:{\\\"left\\\":[0.0,0.3,-0.3,0.5,0.0,0.0,0.0],\\\"right\\\":[0.0,-0.3,0.3,-0.5,0.0,0.0,0.0]}\"}"'
+```
+
+### Status Check
+```bash
+docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash && ros2 topic echo /arm_ctrl/status --once'
+```
+
+### Status Fields
+| Field | Values |
+|-------|--------|
+| arm_state | ARM_DISABLED, HOLDING, MOVING, TEACH, TRANSITIONING |
+| safety | OK, ERROR |
+| recording | YES, NO |
+| task | IDLE, RUNNING |
+| fsm | 801 = READY state |
+
+### Position Error Fix (Common Issue)
+Jab position jump error aaye:
+```bash
+# Step 1: Safety reset
+docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash && ros2 topic pub --once /arm_ctrl/command std_msgs/msg/String "{data: \"reset_safety\"}"'
+
+# Step 2: Home position
+docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source /ros2_ws/install/setup.bash && ros2 topic pub --once /arm_ctrl/command std_msgs/msg/String "{data: \"move_home\"}"'
+```
 ```
 
 ---
