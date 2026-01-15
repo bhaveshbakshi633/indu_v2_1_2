@@ -117,7 +117,7 @@ class StartupHealthCheck:
         return False
     
     def _ssh_restart_service(self, service_config):
-        """SSH se service restart karo"""
+        """SSH se service restart karo - with timeout for background commands"""
         ssh_cfg = service_config.get('ssh', {})
         host = service_config.get('host')
         user = ssh_cfg.get('user')
@@ -138,14 +138,19 @@ class StartupHealthCheck:
             # Stop first if stop_cmd exists
             if stop_cmd:
                 logger.info(f"Stopping {name}...")
-                stdin, stdout, stderr = client.exec_command(stop_cmd)
-                stdout.read()
+                stdin, stdout, stderr = client.exec_command(stop_cmd, timeout=10)
+                try:
+                    stdout.channel.recv(1024)
+                except:
+                    pass
                 time.sleep(2)
             
-            # Start service
+            # Start service - use channel with timeout for background commands
             logger.info(f"Starting {name}...")
-            stdin, stdout, stderr = client.exec_command(start_cmd)
-            stdout.read()
+            stdin, stdout, stderr = client.exec_command(start_cmd, timeout=5)
+            # Don't block on stdout.read() - background commands won't return
+            # Just wait briefly for command to be sent
+            time.sleep(1)
             
             client.close()
             return True
