@@ -1,0 +1,38 @@
+# G1 Orchestrator Configuration
+# ==============================
+
+orchestrator:
+  node_name: "g1_orchestrator"
+  
+  # Action topic
+  action_topic: "/orchestrator/action_command"
+  
+  # Communication verification
+  communication:
+    timeout_sec: 5.0
+    lowstate_topic: "rt/lowstate"
+
+# Bootup sequence parameters
+bootup:
+  standup_wait_sec: 10.0
+  hold_duration_sec: 10.0
+  stiffness_ramp_sec: 2.0
+  blend_duration_sec: 3.0
+
+# Home positions (radians)
+home_positions:
+  left_arm: [0.4, 0.15, 0.0, 0.5, 0.0, 0.0, 0.0]
+  right_arm: [0.4, -0.15, 0.0, 0.5, 0.0, 0.0, 0.0]
+
+# Joint indices
+joint_indices:
+  left_arm: [15, 16, 17, 18, 19, 20, 21]
+  right_arm: [22, 23, 24, 25, 26, 27, 28]
+  waist: [12, 13, 14]
+
+# Gains
+gains:
+  arm_kp: 50.0
+  arm_kd: 1.0
+  waist_kp: 200.0
+  waist_kd: 5.0

@@ -1,0 +1,1372 @@
+/**
+ * Arm Controller Node
+ * 
+ * Step 7.2: Safety thread (done)
+ * Step 7.3: Basic control loop with arm_sdk publisher
+ * 
+ * Key features:
+ * - 500Hz control loop
+ * - Safety checks before every command
+ * - Waist always held stiff
+ * - CRC calculation for LowCmd
+ */
+
+#include "arm_controller/arm_controller.hpp"
+#include "arm_controller/common/motor_crc_hg.h"
+#include <cmath>
+
+namespace arm_controller
+{
+
+// =============================================================================
+// Constructor
+// =============================================================================
+ArmController::ArmController()
+    : Node("arm_controller")
+{
+    RCLCPP_INFO(this->get_logger(), "ArmController node starting...");
+    
+    // Initialize home positions
+    for (size_t i = 0; i < LEFT_ARM.size(); ++i) {
+        home_pos_[LEFT_ARM[i]] = HOME_LEFT[i];
+    }
+    for (size_t i = 0; i < RIGHT_ARM.size(); ++i) {
+        home_pos_[RIGHT_ARM[i]] = HOME_RIGHT[i];
+    }
+    for (size_t i = 0; i < WAIST.size(); ++i) {
+        home_pos_[WAIST[i]] = HOME_WAIST[i];
+    }
+    RCLCPP_INFO(this->get_logger(), "Home positions initialized for %zu joints", home_pos_.size());
+    
+    // Step 7.2: Lowstate subscriber
+    lowstate_sub_ = this->create_subscription<unitree_hg::msg::LowState>(
+        "rt/lowstate", 10,
+        std::bind(&ArmController::lowstateCallback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Subscribed to rt/lowstate");
+    
+    // Step 7.3: Command subscriber (from orchestrator)
+    command_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/arm_ctrl/command", 10,
+        std::bind(&ArmController::commandCallback, this, std::placeholders::_1));
+    RCLCPP_INFO(this->get_logger(), "Subscribed to /arm_ctrl/command");
+    
+    // Step 7.3: Status publisher
+    status_pub_ = this->create_publisher<std_msgs::msg::String>("/arm_ctrl/status", 10);
+    RCLCPP_INFO(this->get_logger(), "Publishing to /arm_ctrl/status");
+    
+    // Step 7.3: Arm SDK publisher
+    arm_sdk_pub_ = this->create_publisher<unitree_hg::msg::LowCmd>("rt/arm_sdk", 10);
+    RCLCPP_INFO(this->get_logger(), "Publishing to rt/arm_sdk");
+    
+    // Start threads
+    running_ = true;
+    safety_thread_ = std::thread(&ArmController::safetyLoop, this);
+    RCLCPP_INFO(this->get_logger(), "Safety thread started (500Hz)");
+    
+    control_thread_ = std::thread(&ArmController::controlLoop, this);
+    RCLCPP_INFO(this->get_logger(), "Control thread started (500Hz)");
+    
+    RCLCPP_INFO(this->get_logger(), "ArmController ready - waiting for lowstate...");
+}
+
+// =============================================================================
+// Destructor
+// =============================================================================
+ArmController::~ArmController()
+{
+    RCLCPP_INFO(this->get_logger(), "ArmController shutting down...");
+    running_ = false;
+    
+    if (safety_thread_.joinable()) {
+        safety_thread_.join();
+        RCLCPP_INFO(this->get_logger(), "Safety thread stopped");
+    }
+    if (control_thread_.joinable()) {
+        control_thread_.join();
+        RCLCPP_INFO(this->get_logger(), "Control thread stopped");
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "ArmController shutdown complete");
+}
+
+// =============================================================================
+// Lowstate Callback - from robot_init.py
+// =============================================================================
+void ArmController::lowstateCallback(const unitree_hg::msg::LowState::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    // Update timestamp - CRITICAL for freshness check
+    auto now = std::chrono::steady_clock::now();
+    
+    // Store previous for velocity calculation
+    if (lowstate_received_) {
+        prev_positions_ = current_pos_;
+        prev_time_ = lowstate_last_time_;
+    }
+    
+    lowstate_last_time_ = now;
+    mode_machine_ = msg->mode_machine;
+    
+    // Update all arm and waist positions
+    for (int j : LEFT_ARM) {
+        if (j < static_cast<int>(msg->motor_state.size())) {
+            current_pos_[j] = msg->motor_state[j].q;
+        }
+    }
+    for (int j : RIGHT_ARM) {
+        if (j < static_cast<int>(msg->motor_state.size())) {
+            current_pos_[j] = msg->motor_state[j].q;
+        }
+    }
+    for (int j : WAIST) {
+        if (j < static_cast<int>(msg->motor_state.size())) {
+            current_pos_[j] = msg->motor_state[j].q;
+        }
+    }
+    
+    if (!lowstate_received_) {
+        lowstate_received_ = true;
+        RCLCPP_INFO(this->get_logger(), "Lowstate received - %zu joints updated", current_pos_.size());
+    }
+}
+
+// =============================================================================
+// Control Loop - 500Hz
+// =============================================================================
+void ArmController::controlLoop()
+{
+    RCLCPP_INFO(this->get_logger(), "[CTRL] Control loop thread started");
+    
+    auto loop_rate = std::chrono::microseconds(2000);  // 500Hz = 2ms
+    
+    while (running_) {
+        auto loop_start = std::chrono::steady_clock::now();
+        
+        // Rule 1: NO command if safety not OK
+        if (!safety_ok_.load()) {
+            // Just sleep and continue - safety thread handles warnings
+            auto elapsed = std::chrono::steady_clock::now() - loop_start;
+            if (elapsed < loop_rate) {
+                std::this_thread::sleep_for(loop_rate - elapsed);
+            }
+            continue;
+        }
+        
+        // Rule 2: NO command if no fresh lowstate
+        if (!lowstate_received_.load()) {
+            auto elapsed = std::chrono::steady_clock::now() - loop_start;
+            if (elapsed < loop_rate) {
+                std::this_thread::sleep_for(loop_rate - elapsed);
+            }
+            continue;
+        }
+        
+        // State machine
+        ArmState current_state;
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            current_state = arm_state_;
+        }
+        
+        switch (current_state) {
+            case ArmState::IDLE:
+                // Do nothing - no commands sent
+                break;
+                
+            case ArmState::HOLDING:
+                // Send hold command at current commanded position
+                {
+                    std::lock_guard<std::mutex> lock(state_mutex_);
+                    if (!commanded_pos_.empty()) {
+                        sendArmCmd(commanded_pos_);
+                    }
+                }
+                break;
+                
+            case ArmState::MOVING:
+                // moveTo/moveToHome handle command sending - do nothing here
+                break;
+                
+            case ArmState::TEACH:
+                // Gravity compensation - send with TEACH gains
+                {
+                    std::lock_guard<std::mutex> lock(state_mutex_);
+                    sendArmCmdWithKp(current_pos_, SLOW_COAST_KP, {}, 1.0);
+                }
+                break;
+        }
+        
+        // Publish status periodically (every ~100ms = every 50 loops)
+        static int status_counter = 0;
+        if (++status_counter >= 50) {
+            publishStatus();
+            status_counter = 0;
+        }
+        
+        // Rate limiting
+        auto elapsed = std::chrono::steady_clock::now() - loop_start;
+        if (elapsed < loop_rate) {
+            std::this_thread::sleep_for(loop_rate - elapsed);
+        }
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "[CTRL] Control loop thread exiting");
+}
+
+// =============================================================================
+// Send Arm Command - from robot_init.py lines 575-670
+// CRITICAL: mode_pr=1, waist always stiff, CRC required
+// =============================================================================
+void ArmController::sendArmCmd(const std::map<int, double>& positions,
+                               const std::map<int, double>& velocities,
+                               double weight)
+{
+    sendArmCmdWithKp(positions, arm_kp_, velocities, weight);
+}
+
+void ArmController::sendArmCmdWithKp(const std::map<int, double>& positions,
+                                     double kp,
+                                     const std::map<int, double>& velocities,
+                                     double weight)
+{
+    unitree_hg::msg::LowCmd cmd;
+    
+    // CRITICAL: mode_pr=1 for arm SDK overlay (body balance stays ON!)
+    cmd.mode_pr = 1;
+    cmd.mode_machine = mode_machine_;
+    
+    // Clamp positions to safe limits
+    auto clamped = clampJointPositions(positions);
+    
+    // LEFT ARM (joints 15-21)
+    for (size_t i = 0; i < LEFT_ARM.size(); ++i) {
+        int j = LEFT_ARM[i];
+        cmd.motor_cmd[j].mode = 1;
+        
+        // Position - use clamped if available, else current
+        auto it = clamped.find(j);
+        if (it != clamped.end()) {
+            cmd.motor_cmd[j].q = static_cast<float>(it->second);
+        } else {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            cmd.motor_cmd[j].q = static_cast<float>(current_pos_[j]);
+        }
+        
+        // Velocity - use provided or 0
+        auto vel_it = velocities.find(j);
+        cmd.motor_cmd[j].dq = (vel_it != velocities.end()) ? 
+            static_cast<float>(vel_it->second) : 0.0f;
+        
+        cmd.motor_cmd[j].tau = 0.0f;
+        cmd.motor_cmd[j].kp = static_cast<float>(kp);
+        cmd.motor_cmd[j].kd = static_cast<float>(arm_kd_);
+    }
+    
+    // RIGHT ARM (joints 22-28)
+    for (size_t i = 0; i < RIGHT_ARM.size(); ++i) {
+        int j = RIGHT_ARM[i];
+        cmd.motor_cmd[j].mode = 1;
+        
+        auto it = clamped.find(j);
+        if (it != clamped.end()) {
+            cmd.motor_cmd[j].q = static_cast<float>(it->second);
+        } else {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            cmd.motor_cmd[j].q = static_cast<float>(current_pos_[j]);
+        }
+        
+        auto vel_it = velocities.find(j);
+        cmd.motor_cmd[j].dq = (vel_it != velocities.end()) ? 
+            static_cast<float>(vel_it->second) : 0.0f;
+        
+        cmd.motor_cmd[j].tau = 0.0f;
+        cmd.motor_cmd[j].kp = static_cast<float>(kp);
+        cmd.motor_cmd[j].kd = static_cast<float>(arm_kd_);
+    }
+    
+    // WAIST (joints 12-14) - ALWAYS STIFF at position 0
+    for (size_t i = 0; i < WAIST.size(); ++i) {
+        int j = WAIST[i];
+        cmd.motor_cmd[j].mode = 1;
+        cmd.motor_cmd[j].q = 0.0f;  // Always hold at 0
+        cmd.motor_cmd[j].dq = 0.0f;
+        cmd.motor_cmd[j].tau = 0.0f;
+        cmd.motor_cmd[j].kp = static_cast<float>(waist_kp_);
+        cmd.motor_cmd[j].kd = static_cast<float>(waist_kd_);
+    }
+    
+    // Arm SDK weight (joint 29)
+    cmd.motor_cmd[G1_ARM_SDK_WEIGHT].q = static_cast<float>(weight);
+    
+    // CRC - MANDATORY
+    get_crc(cmd);
+    
+    // Publish
+    arm_sdk_pub_->publish(cmd);
+}
+
+// =============================================================================
+// Command Callback - parse commands from orchestrator
+// =============================================================================
+void ArmController::commandCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    std::string cmd = msg->data;
+    RCLCPP_INFO(this->get_logger(), "[CMD] Received: %s", cmd.c_str());
+    
+    // Parse command
+    if (cmd == "init_arms") {
+        initArms();
+    }
+    else if (cmd == "move_home") {
+        moveToHome();
+    }
+    else if (cmd == "stop") {
+        stop();
+    }
+    else if (cmd == "enter_teach") {
+        enterTeach();
+    }
+    else if (cmd == "exit_teach") {
+        exitTeach();
+    }
+    else if (cmd == "record") {
+        recordPosition();
+    }
+    else if (cmd.rfind("move_to:", 0) == 0) {
+        // Parse JSON: {"left": [...], "right": [...], "blend_time": 2.0}
+        std::string json = cmd.substr(8);
+        handleMoveToCommand(json);
+    }
+    else if (cmd.rfind("policy:", 0) == 0) {
+        // Policy-based movement - same format as move_to
+        // {"left": [...], "right": [...], "blend_time": 0.5}
+        std::string json = cmd.substr(7);
+        RCLCPP_INFO(this->get_logger(), "[POLICY] Received target from Python policy");
+        handleMoveToCommand(json);
+    }
+    else if (cmd.rfind("sequence:", 0) == 0) {
+        // Parse JSON sequence - TODO Step 7.6
+        std::string json = cmd.substr(9);
+        executeSequence(json);
+    }
+    else {
+        RCLCPP_WARN(this->get_logger(), "[CMD] Unknown command: %s", cmd.c_str());
+    }
+}
+
+// =============================================================================
+// Publish Status
+// =============================================================================
+
+// =============================================================================
+// Handle move_to/policy command - parse JSON and execute movement
+// Format: {"left": [7 positions], "right": [7 positions], "blend_time": 2.0}
+// Either "left" or "right" can be null to keep that arm at current position
+// =============================================================================
+void ArmController::handleMoveToCommand(const std::string& json_str) {
+    // Parse JSON
+    nlohmann::json cmd;
+    try {
+        cmd = nlohmann::json::parse(json_str);
+    } catch (const nlohmann::json::parse_error& e) {
+        RCLCPP_ERROR(this->get_logger(), "[MOVE_TO] JSON parse error: %s", e.what());
+        return;
+    }
+    
+    // Build target position map
+    std::map<int, double> target;
+    
+    // Parse left arm positions
+    if (cmd.contains("left") && !cmd["left"].is_null()) {
+        auto left_pos = cmd["left"];
+        if (left_pos.is_array() && left_pos.size() == LEFT_ARM.size()) {
+            for (size_t i = 0; i < LEFT_ARM.size(); ++i) {
+                target[LEFT_ARM[i]] = left_pos[i].get<double>();
+            }
+            RCLCPP_INFO(this->get_logger(), "[MOVE_TO] Left arm: %zu positions", LEFT_ARM.size());
+        } else {
+            RCLCPP_WARN(this->get_logger(), "[MOVE_TO] Invalid left arm array (expected %zu)", LEFT_ARM.size());
+        }
+    } else {
+        // Keep current left arm positions
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        for (int j : LEFT_ARM) {
+            auto it = commanded_pos_.find(j);
+            if (it != commanded_pos_.end()) {
+                target[j] = it->second;
+            }
+        }
+    }
+    
+    // Parse right arm positions
+    if (cmd.contains("right") && !cmd["right"].is_null()) {
+        auto right_pos = cmd["right"];
+        if (right_pos.is_array() && right_pos.size() == RIGHT_ARM.size()) {
+            for (size_t i = 0; i < RIGHT_ARM.size(); ++i) {
+                target[RIGHT_ARM[i]] = right_pos[i].get<double>();
+            }
+            RCLCPP_INFO(this->get_logger(), "[MOVE_TO] Right arm: %zu positions", RIGHT_ARM.size());
+        } else {
+            RCLCPP_WARN(this->get_logger(), "[MOVE_TO] Invalid right arm array (expected %zu)", RIGHT_ARM.size());
+        }
+    } else {
+        // Keep current right arm positions
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        for (int j : RIGHT_ARM) {
+            auto it = commanded_pos_.find(j);
+            if (it != commanded_pos_.end()) {
+                target[j] = it->second;
+            }
+        }
+    }
+    
+    // Get blend time
+    double blend_time = cmd.value("blend_time", BLEND_DURATION);
+    blend_time = std::max(blend_time, MIN_BLEND_TIME);
+    
+    RCLCPP_INFO(this->get_logger(), "[MOVE_TO] Executing: %zu joints, blend=%.2fs",
+                target.size(), blend_time);
+    
+    // Execute movement
+    moveTo(target, blend_time);
+}
+
+void ArmController::publishStatus()
+{
+    std_msgs::msg::String status_msg;
+    
+    std::string state_str;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        state_str = getStateName();
+    }
+    
+    // Format: "state:STATE,safety:OK/FAIL,lowstate:YES/NO"
+    status_msg.data = "state:" + state_str + 
+                      ",safety:" + (safety_ok_.load() ? "OK" : "FAIL") +
+                      ",lowstate:" + (lowstate_received_.load() ? "YES" : "NO");
+    
+    status_pub_->publish(status_msg);
+}
+
+// =============================================================================
+// Stop - hold current position
+// =============================================================================
+bool ArmController::stop()
+{
+    RCLCPP_INFO(this->get_logger(), "[CMD] Stop - holding current position");
+    
+    // Capture current position
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        commanded_pos_ = current_pos_;
+    }
+    
+    setArmState(ArmState::HOLDING, "Stop command");
+    return true;
+}
+
+// =============================================================================
+// Safety Loop - 500Hz (from Step 7.2)
+// =============================================================================
+void ArmController::safetyLoop()
+{
+    RCLCPP_INFO(this->get_logger(), "[SAFETY] Safety loop thread started");
+    
+    auto loop_rate = std::chrono::microseconds(2000);
+    
+    while (running_) {
+        auto loop_start = std::chrono::steady_clock::now();
+        
+        bool all_ok = true;
+        
+        if (!checkLowstateFresh()) {
+            all_ok = false;
+        }
+        
+        if (all_ok && !commanded_pos_.empty()) {
+            if (!checkPositionError()) {
+                all_ok = false;
+            }
+        }
+        
+        if (all_ok && lowstate_received_) {
+            if (!checkVelocity()) {
+                all_ok = false;
+            }
+        }
+        
+        safety_ok_ = all_ok;
+        
+        auto elapsed = std::chrono::steady_clock::now() - loop_start;
+        if (elapsed < loop_rate) {
+            std::this_thread::sleep_for(loop_rate - elapsed);
+        }
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "[SAFETY] Safety loop thread exiting");
+}
+
+// =============================================================================
+// Safety Checks (from Step 7.2)
+// =============================================================================
+bool ArmController::checkLowstateFresh()
+{
+    if (!lowstate_received_) {
+        static auto last_warn = std::chrono::steady_clock::now();
+        auto now = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_warn).count() >= 1) {
+            RCLCPP_WARN(this->get_logger(), "[SAFETY] No lowstate received - commands REJECTED");
+            last_warn = now;
+        }
+        return false;
+    }
+    
+    std::chrono::steady_clock::time_point last_time;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        last_time = lowstate_last_time_;
+    }
+    
+    auto now = std::chrono::steady_clock::now();
+    auto age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_time).count();
+    
+    if (age_ms > 500) {
+        static auto last_warn = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_warn).count() >= 1) {
+            RCLCPP_WARN(this->get_logger(), 
+                "[SAFETY] Lowstate stale (%.2fs) - commands REJECTED", 
+                age_ms / 1000.0);
+            last_warn = now;
+        }
+        return false;
+    }
+    
+    return true;
+}
+
+bool ArmController::checkPositionError()
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    for (const auto& [joint, cmd_pos] : commanded_pos_) {
+        auto it = current_pos_.find(joint);
+        if (it != current_pos_.end()) {
+            double error = std::abs(cmd_pos - it->second);
+            
+            if (error > MAX_POSITION_ERROR) {
+                std::string joint_name = "Joint_" + std::to_string(joint);
+                auto name_it = JOINT_NAMES.find(joint);
+                if (name_it != JOINT_NAMES.end()) {
+                    joint_name = name_it->second;
+                }
+                
+                RCLCPP_WARN(this->get_logger(),
+                    "[SAFETY] Position error %.3f rad on %s (limit: %.1f) - command REJECTED",
+                    error, joint_name.c_str(), MAX_POSITION_ERROR);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool ArmController::checkVelocity()
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    if (prev_positions_.empty()) {
+        return true;
+    }
+    
+    auto now = std::chrono::steady_clock::now();
+    double dt = std::chrono::duration<double>(now - prev_time_).count();
+    
+    if (dt <= 0) {
+        return true;
+    }
+    
+    for (const auto& [joint, curr_pos] : current_pos_) {
+        auto it = prev_positions_.find(joint);
+        if (it != prev_positions_.end()) {
+            double velocity = std::abs(curr_pos - it->second) / dt;
+            
+            if (velocity > MAX_JOINT_VELOCITY) {
+                std::string joint_name = "Joint_" + std::to_string(joint);
+                auto name_it = JOINT_NAMES.find(joint);
+                if (name_it != JOINT_NAMES.end()) {
+                    joint_name = name_it->second;
+                }
+                
+                RCLCPP_WARN(this->get_logger(),
+                    "[SAFETY] Velocity %.2f rad/s on %s (limit: %.1f) - command REJECTED",
+                    velocity, joint_name.c_str(), MAX_JOINT_VELOCITY);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+bool ArmController::validateJump(const std::map<int, double>& target)
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    for (const auto& [joint, target_pos] : target) {
+        auto it = current_pos_.find(joint);
+        if (it != current_pos_.end()) {
+            double jump = std::abs(target_pos - it->second);
+            
+            if (jump > MAX_JOINT_JUMP) {
+                std::string joint_name = "Joint_" + std::to_string(joint);
+                auto name_it = JOINT_NAMES.find(joint);
+                if (name_it != JOINT_NAMES.end()) {
+                    joint_name = name_it->second;
+                }
+                
+                RCLCPP_WARN(this->get_logger(),
+                    "[SAFETY] Jump %.2f rad on %s (limit: %.1f) - motion REFUSED",
+                    jump, joint_name.c_str(), MAX_JOINT_JUMP);
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+std::map<int, double> ArmController::clampJointPositions(const std::map<int, double>& positions)
+{
+    std::map<int, double> clamped;
+    auto all_limits = getAllJointLimits();
+    
+    for (const auto& [joint, pos] : positions) {
+        double clamped_pos = pos;
+        
+        auto it = all_limits.find(joint);
+        if (it != all_limits.end()) {
+            double min_lim = it->second.min;
+            double max_lim = it->second.max;
+            
+            std::string joint_name = "Joint_" + std::to_string(joint);
+            auto name_it = JOINT_NAMES.find(joint);
+            if (name_it != JOINT_NAMES.end()) {
+                joint_name = name_it->second;
+            }
+            
+            if (pos < min_lim) {
+                RCLCPP_WARN(this->get_logger(),
+                    "[SAFETY] %s clamped from %.3f to hard limit %.3f",
+                    joint_name.c_str(), pos, min_lim);
+                clamped_pos = min_lim;
+            } else if (pos > max_lim) {
+                RCLCPP_WARN(this->get_logger(),
+                    "[SAFETY] %s clamped from %.3f to hard limit %.3f",
+                    joint_name.c_str(), pos, max_lim);
+                clamped_pos = max_lim;
+            }
+        }
+        
+        clamped[joint] = clamped_pos;
+    }
+    
+    return clamped;
+}
+
+// =============================================================================
+// State Queries
+// =============================================================================
+ArmState ArmController::getState() const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return arm_state_;
+}
+
+std::string ArmController::getStateName() const
+{
+    ArmState s;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        s = arm_state_;
+    }
+    switch (s) {
+        case ArmState::IDLE: return "IDLE";
+        case ArmState::HOLDING: return "HOLDING";
+        case ArmState::MOVING: return "MOVING";
+        case ArmState::TEACH: return "TEACH";
+        default: return "UNKNOWN";
+    }
+}
+
+bool ArmController::isReady() const
+{
+    return init_complete_.load() && safety_ok_.load();
+}
+
+bool ArmController::isMoving() const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return arm_state_ == ArmState::MOVING;
+}
+
+std::map<int, double> ArmController::getCurrentPositions() const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return current_pos_;
+}
+
+std::map<int, double> ArmController::getCommandedPositions() const
+{
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return commanded_pos_;
+}
+
+void ArmController::setArmState(ArmState new_state, const std::string& message)
+{
+    std::string old_name = getStateName();
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        arm_state_ = new_state;
+    }
+    RCLCPP_INFO(this->get_logger(), "[ARM] State: %s -> %s %s",
+                old_name.c_str(), getStateName().c_str(), message.c_str());
+}
+
+void ArmController::setBootState(BootState new_state, const std::string& message)
+{
+    auto state_name = [](BootState s) {
+        switch(s) {
+            case BootState::DISCONNECTED: return "DISCONNECTED";
+            case BootState::INIT: return "INIT";
+            case BootState::WAIT_LOWSTATE: return "WAIT_LOWSTATE";
+            case BootState::DAMPING: return "DAMPING";
+            case BootState::STANDING_UP: return "STANDING_UP";
+            case BootState::READY: return "READY";
+            case BootState::HOLDING: return "HOLDING";
+            case BootState::MOVING_TO_HOME: return "MOVING_TO_HOME";
+            case BootState::AT_HOME: return "AT_HOME";
+            case BootState::ERROR: return "ERROR";
+            default: return "UNKNOWN";
+        }
+    };
+    RCLCPP_INFO(this->get_logger(), "[BOOT] %s: %s", state_name(new_state), message.c_str());
+    boot_state_ = new_state;
+}
+
+// =============================================================================
+// Stubs - to be implemented in later steps
+// =============================================================================
+
+bool ArmController::initArms() {
+    RCLCPP_INFO(this->get_logger(), "");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    ARM INIT SEQUENCE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    // Skip if already done
+    if (init_complete_.load()) {
+        RCLCPP_INFO(this->get_logger(), "[INIT] Already complete, skipping...");
+        return true;
+    }
+    
+    setBootState(BootState::INIT, "Starting arm init");
+    
+    // Step 1: Wait for lowstate
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 1: Waiting for lowstate...");
+    setBootState(BootState::WAIT_LOWSTATE, "Waiting for feedback");
+    
+    auto start = std::chrono::steady_clock::now();
+    int timeout_sec = 5;
+    
+    while (!lowstate_received_.load()) {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
+        if (elapsed > timeout_sec) {
+            RCLCPP_ERROR(this->get_logger(), "[INIT] FAILED - No lowstate after %ds", timeout_sec);
+            setBootState(BootState::ERROR, "No lowstate received");
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 1: DONE - Lowstate received");
+    
+    // Step 2: Capture current position as hold position
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 2: Capturing hold position...");
+    std::map<int, double> hold_copy;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        hold_pos_ = current_pos_;
+        commanded_pos_ = current_pos_;
+        hold_copy = current_pos_;
+    }
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 2: DONE - %zu joint positions captured", hold_copy.size());
+    
+    // Step 3: Stiffness ramp (START_KP to END_KP over RAMP_DURATION)
+    // kp: 10 -> 50 over 2 seconds (smooth transition)
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 3: Stiffness ramp (%.1f -> %.1f over %.1fs)...",
+                START_KP, END_KP, RAMP_DURATION);
+    setBootState(BootState::HOLDING, "Stiffness ramp in progress");
+    
+    auto ramp_start = std::chrono::steady_clock::now();
+    auto last_log = ramp_start;
+    
+    while (true) {
+        auto now = std::chrono::steady_clock::now();
+        double elapsed = std::chrono::duration<double>(now - ramp_start).count();
+        
+        if (elapsed >= RAMP_DURATION) {
+            break;
+        }
+        
+        // Linear interpolation for kp
+        double ratio = elapsed / RAMP_DURATION;
+        double current_kp = START_KP + (END_KP - START_KP) * ratio;
+        
+        // Send command with ramping kp (no mutex needed - hold_copy is local)
+        sendArmCmdWithKp(hold_copy, current_kp, {}, 1.0);
+        
+        // Log every 500ms
+        auto log_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_log).count();
+        if (log_elapsed > 500) {
+            RCLCPP_INFO(this->get_logger(), "[INIT] Kp = %.1f (%.0f%%)", current_kp, ratio * 100);
+            last_log = now;
+        }
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));  // 500Hz
+    }
+    
+    // Final: Set full stiffness and send final command
+    arm_kp_ = END_KP;
+    sendArmCmdWithKp(hold_copy, arm_kp_, {}, 1.0);
+    RCLCPP_INFO(this->get_logger(), "[INIT] Step 3: DONE - Kp = %.1f", arm_kp_);
+    
+    // Set state to HOLDING - control loop takes over now
+    setArmState(ArmState::HOLDING, "Init complete, holding position");
+    init_complete_ = true;
+    
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    ARM INIT COMPLETE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "");
+    
+    return true;
+}
+
+bool ArmController::moveToHome(double blend_time) {
+    RCLCPP_INFO(this->get_logger(), "");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    MOVE TO HOME");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    // Check init complete
+    if (!init_complete_.load()) {
+        RCLCPP_ERROR(this->get_logger(), "[HOME] REFUSED - Arms not initialized");
+        return false;
+    }
+    
+    // Build home target from constants
+    std::map<int, double> home_target;
+    
+    for (size_t i = 0; i < LEFT_ARM.size(); ++i) {
+        home_target[LEFT_ARM[i]] = HOME_LEFT[i];
+    }
+    for (size_t i = 0; i < RIGHT_ARM.size(); ++i) {
+        home_target[RIGHT_ARM[i]] = HOME_RIGHT[i];
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "[HOME] Target: LEFT=[%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
+                HOME_LEFT[0], HOME_LEFT[1], HOME_LEFT[2], HOME_LEFT[3], 
+                HOME_LEFT[4], HOME_LEFT[5], HOME_LEFT[6]);
+    RCLCPP_INFO(this->get_logger(), "[HOME] Target: RIGHT=[%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f]",
+                HOME_RIGHT[0], HOME_RIGHT[1], HOME_RIGHT[2], HOME_RIGHT[3],
+                HOME_RIGHT[4], HOME_RIGHT[5], HOME_RIGHT[6]);
+    
+    // Use default blend time if not specified
+    double duration = (blend_time > 0) ? blend_time : BLEND_DURATION;
+    RCLCPP_INFO(this->get_logger(), "[HOME] Blend time: %.2fs", duration);
+    
+    bool result = moveTo(home_target, duration);
+    
+    if (result) {
+        setBootState(BootState::AT_HOME, "Arms at home position");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "    AT HOME");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "[HOME] Motion failed");
+    }
+    
+    return result;
+}
+
+bool ArmController::moveTo(const std::map<int, double>& target, double blend_time) {
+    // Clamp blend time to minimum
+    double duration = std::max(blend_time, MIN_BLEND_TIME);
+    
+    RCLCPP_INFO(this->get_logger(), "[MOTION] moveTo: %zu joints, blend_time=%.2fs",
+                target.size(), duration);
+    
+    // Safety check: validate jump distance
+    if (!validateJump(target)) {
+        RCLCPP_ERROR(this->get_logger(), "[MOTION] REFUSED - Jump too large");
+        return false;
+    }
+    
+    // Safety check: must have lowstate
+    if (!lowstate_received_.load()) {
+        RCLCPP_ERROR(this->get_logger(), "[MOTION] REFUSED - No lowstate");
+        return false;
+    }
+    
+    // Clamp target positions to joint limits
+    auto clamped_target = clampJointPositions(target);
+    
+    // Setup motion parameters
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        blend_duration_ = duration;
+    }
+    prepareMotion(clamped_target);
+    
+    // Change state to MOVING
+    setArmState(ArmState::MOVING, "Starting motion");
+    
+    // Motion loop - runs until complete
+    auto loop_rate = std::chrono::microseconds(2000);  // 500Hz
+    
+    while (true) {
+        auto loop_start = std::chrono::steady_clock::now();
+        
+        // Safety check
+        if (!safety_ok_.load()) {
+            RCLCPP_ERROR(this->get_logger(), "[MOTION] ABORTED - Safety check failed");
+            setArmState(ArmState::HOLDING, "Safety abort");
+            return false;
+        }
+        
+        // Compute blend
+        auto [positions, velocities] = computeBlend(clamped_target);
+        
+        // Check if motion complete
+        double elapsed;
+        double T;
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            elapsed = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - motion_start_time_).count();
+            T = blend_duration_;
+        }
+        
+        if (elapsed >= T) {
+            // Motion complete - send final position
+            {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                commanded_pos_ = clamped_target;
+                
+            }
+            sendArmCmd(clamped_target, {}, 1.0);
+            RCLCPP_INFO(this->get_logger(), "[MOTION] Complete");
+            break;
+        }
+        
+        // Send command with blended positions and velocities
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            commanded_pos_ = positions;
+        }
+        sendArmCmd(positions, velocities, 1.0);
+        
+        // Rate limiting
+        auto elapsed_loop = std::chrono::steady_clock::now() - loop_start;
+        if (elapsed_loop < loop_rate) {
+            std::this_thread::sleep_for(loop_rate - elapsed_loop);
+        }
+    }
+    
+    // Transition to HOLDING
+    setArmState(ArmState::HOLDING, "Motion complete, holding");
+    
+    return true;
+}
+
+
+bool ArmController::executeSequence(const std::string& json_sequence) {
+    RCLCPP_INFO(this->get_logger(), "");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    EXECUTING SEQUENCE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    // Check init complete
+    if (!init_complete_.load()) {
+        RCLCPP_ERROR(this->get_logger(), "[SEQUENCE] REFUSED - Arms not initialized");
+        return false;
+    }
+    
+    // Parse JSON
+    nlohmann::json seq;
+    try {
+        seq = nlohmann::json::parse(json_sequence);
+    } catch (const nlohmann::json::parse_error& e) {
+        RCLCPP_ERROR(this->get_logger(), "[SEQUENCE] JSON parse error: %s", e.what());
+        return false;
+    }
+    
+    // Get sequence name if present
+    std::string seq_name = seq.value("sequence_name", "unnamed");
+    RCLCPP_INFO(this->get_logger(), "[SEQUENCE] Name: %s", seq_name.c_str());
+    
+    // Get waypoints array
+    if (!seq.contains("waypoints") || !seq["waypoints"].is_array()) {
+        RCLCPP_ERROR(this->get_logger(), "[SEQUENCE] Missing 'waypoints' array");
+        return false;
+    }
+    
+    auto waypoints = seq["waypoints"];
+    size_t num_waypoints = waypoints.size();
+    RCLCPP_INFO(this->get_logger(), "[SEQUENCE] Waypoints: %zu", num_waypoints);
+    
+    if (num_waypoints == 0) {
+        RCLCPP_WARN(this->get_logger(), "[SEQUENCE] Empty waypoints array");
+        return true;
+    }
+    
+    // Execute each waypoint
+    for (size_t i = 0; i < num_waypoints; ++i) {
+        auto& wp = waypoints[i];
+        
+        RCLCPP_INFO(this->get_logger(), "[SEQUENCE] Waypoint %zu/%zu", i + 1, num_waypoints);
+        
+        // Build target position map
+        std::map<int, double> target;
+        
+        // Parse left arm positions (null means keep current)
+        if (wp.contains("left") && !wp["left"].is_null()) {
+            auto left_pos = wp["left"];
+            if (left_pos.is_array() && left_pos.size() == LEFT_ARM.size()) {
+                for (size_t j = 0; j < LEFT_ARM.size(); ++j) {
+                    target[LEFT_ARM[j]] = left_pos[j].get<double>();
+                }
+            } else {
+                RCLCPP_WARN(this->get_logger(), "[SEQUENCE] WP%zu: Invalid left arm positions", i);
+            }
+        } else {
+            // Keep current left arm positions
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            for (int joint : LEFT_ARM) {
+                auto it = commanded_pos_.find(joint);
+                if (it != commanded_pos_.end()) {
+                    target[joint] = it->second;
+                }
+            }
+        }
+        
+        // Parse right arm positions (null means keep current)
+        if (wp.contains("right") && !wp["right"].is_null()) {
+            auto right_pos = wp["right"];
+            if (right_pos.is_array() && right_pos.size() == RIGHT_ARM.size()) {
+                for (size_t j = 0; j < RIGHT_ARM.size(); ++j) {
+                    target[RIGHT_ARM[j]] = right_pos[j].get<double>();
+                }
+            } else {
+                RCLCPP_WARN(this->get_logger(), "[SEQUENCE] WP%zu: Invalid right arm positions", i);
+            }
+        } else {
+            // Keep current right arm positions
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            for (int joint : RIGHT_ARM) {
+                auto it = commanded_pos_.find(joint);
+                if (it != commanded_pos_.end()) {
+                    target[joint] = it->second;
+                }
+            }
+        }
+        
+        // Get blend time (default to MIN_BLEND_TIME if not specified)
+        double blend_time = wp.value("blend_time", MIN_BLEND_TIME);
+        blend_time = std::max(blend_time, MIN_BLEND_TIME);  // Never less than min
+        
+        RCLCPP_INFO(this->get_logger(), "[SEQUENCE] WP%zu: %zu joints, blend=%.2fs",
+                    i, target.size(), blend_time);
+        
+        // Execute motion to waypoint
+        bool result = moveTo(target, blend_time);
+        
+        if (!result) {
+            RCLCPP_ERROR(this->get_logger(), "[SEQUENCE] ABORTED at waypoint %zu", i);
+            return false;
+        }
+        
+        // Small delay between waypoints (optional - can remove if not needed)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    SEQUENCE COMPLETE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    return true;
+}
+
+
+bool ArmController::enterTeach() {
+    RCLCPP_INFO(this->get_logger(), "");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    ENTERING TEACH MODE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    // Check init complete
+    if (!init_complete_.load()) {
+        RCLCPP_ERROR(this->get_logger(), "[TEACH] REFUSED - Arms not initialized");
+        return false;
+    }
+    
+    // Check not already in teach mode
+    if (arm_state_ == ArmState::TEACH) {
+        RCLCPP_INFO(this->get_logger(), "[TEACH] Already in teach mode");
+        return true;
+    }
+    
+    // Clear recorded positions
+    recorded_positions_.clear();
+    RCLCPP_INFO(this->get_logger(), "[TEACH] Recorded positions cleared");
+    
+    // Fix: Stop controlLoop from interfering during transition
+    setArmState(ArmState::IDLE, "Transitioning to teach");
+    
+    // Ramp down stiffness (1 second ramp from current kp to 0)
+    RCLCPP_INFO(this->get_logger(), "[TEACH] Ramping down stiffness (1s)...");
+    
+    std::map<int, double> hold_pos;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        hold_pos = current_pos_;
+    }
+    
+    double start_kp = arm_kp_;
+    double end_kp = SLOW_COAST_KP;
+    double ramp_time = 1.0;
+    
+    auto ramp_start = std::chrono::steady_clock::now();
+    
+    while (true) {
+        auto now = std::chrono::steady_clock::now();
+        double elapsed = std::chrono::duration<double>(now - ramp_start).count();
+        
+        if (elapsed >= ramp_time) {
+            break;
+        }
+        
+        double ratio = elapsed / ramp_time;
+        double current_kp = start_kp + (end_kp - start_kp) * ratio;
+        
+        // Update hold position with current feedback (follow arm movement)
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            hold_pos = current_pos_;
+        }
+        
+        sendArmCmdWithKp(hold_pos, current_kp, {}, 1.0);
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    
+    // Set to teach mode - control loop will take over
+    setArmState(ArmState::TEACH, "Gravity compensation active");
+    
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    TEACH MODE ACTIVE");
+    RCLCPP_INFO(this->get_logger(), "    Arms are now moveable by hand");
+    RCLCPP_INFO(this->get_logger(), "    Use 'record' to capture positions");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    return true;
+}
+
+bool ArmController::recordPosition() {
+    // Check in teach mode
+    if (arm_state_ != ArmState::TEACH) {
+        RCLCPP_WARN(this->get_logger(), "[RECORD] Not in teach mode");
+        return false;
+    }
+    
+    // Capture current positions
+    std::map<int, double> pos_snapshot;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        pos_snapshot = current_pos_;
+    }
+    
+    // Store in recorded list
+    recorded_positions_.push_back(pos_snapshot);
+    
+    RCLCPP_INFO(this->get_logger(), "[RECORD] Position %zu captured (%zu joints)",
+                recorded_positions_.size(), pos_snapshot.size());
+    
+    return true;
+}
+
+bool ArmController::exitTeach() {
+    RCLCPP_INFO(this->get_logger(), "");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    EXITING TEACH MODE");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    // Check in teach mode
+    if (arm_state_ != ArmState::TEACH) {
+        RCLCPP_WARN(this->get_logger(), "[TEACH] Not in teach mode");
+        return false;
+    }
+    
+    // Capture current position as hold position
+    std::map<int, double> hold_pos;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        hold_pos = current_pos_;
+        commanded_pos_ = current_pos_;
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "[TEACH] Hold position captured");
+    
+    // Fix: Stop controlLoop from interfering during transition
+    setArmState(ArmState::IDLE, "Transitioning from teach");
+    
+    // Ramp up stiffness (1 second ramp from 0 to END_KP)
+    RCLCPP_INFO(this->get_logger(), "[TEACH] Ramping up stiffness (1s)...");
+    
+    double start_kp = SLOW_COAST_KP;
+    double end_kp = END_KP;
+    double ramp_time = 1.0;
+    
+    auto ramp_start = std::chrono::steady_clock::now();
+    
+    while (true) {
+        auto now = std::chrono::steady_clock::now();
+        double elapsed = std::chrono::duration<double>(now - ramp_start).count();
+        
+        if (elapsed >= ramp_time) {
+            break;
+        }
+        
+        double ratio = elapsed / ramp_time;
+        double current_kp = start_kp + (end_kp - start_kp) * ratio;
+        
+        sendArmCmdWithKp(hold_pos, current_kp, {}, 1.0);
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    
+    // Set final gains
+    arm_kp_ = END_KP;
+    
+    // Transition to HOLDING
+    setArmState(ArmState::HOLDING, "Exited teach mode");
+    
+    RCLCPP_INFO(this->get_logger(), "[TEACH] Recorded %zu positions", recorded_positions_.size());
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "    TEACH MODE EXITED");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    
+    return true;
+}
+
+void ArmController::triggerDamp(const std::string& reason) {
+    RCLCPP_ERROR(this->get_logger(), "[SAFETY] DAMP reason logged: %s", reason.c_str());
+    safety_ok_ = false;
+}
+
+void ArmController::prepareMotion(const std::map<int, double>& target) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    
+    // Capture start positions - use commanded_pos_ (safer than current)
+    start_pos_ = current_pos_;  // Fix: use actual position
+    target_pos_ = target;
+    
+    // Calculate distances for each joint
+    distances_.clear();
+    for (const auto& [joint, target_pos] : target) {
+        auto it = start_pos_.find(joint);
+        if (it != start_pos_.end()) {
+            distances_[joint] = target_pos - it->second;
+        } else {
+            distances_[joint] = 0.0;
+        }
+    }
+    
+    // Reset motion timer
+    motion_start_time_ = std::chrono::steady_clock::now();
+    
+    
+    RCLCPP_INFO(this->get_logger(), "[MOTION] Prepared: %zu joints, T=%.2fs",
+                distances_.size(), blend_duration_);
+}
+
+std::pair<std::map<int, double>, std::map<int, double>> ArmController::computeBlend(
+    const std::map<int, double>& target) {
+    
+    (void)target;  // Using stored target_pos_
+    
+    std::map<int, double> positions;
+    std::map<int, double> velocities;
+    
+    // Get motion parameters
+    auto now = std::chrono::steady_clock::now();
+    double elapsed;
+    double T;
+    std::map<int, double> start_pos;
+    std::map<int, double> distances;
+    
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        elapsed = std::chrono::duration<double>(now - motion_start_time_).count();
+        T = blend_duration_;
+        start_pos = start_pos_;
+        distances = distances_;
+    }
+    
+    // Clamp ratio to [0, 1]
+    double ratio = std::min(1.0, elapsed / T);
+    
+    // Smoothstep: s(t) = 3t² - 2t³
+    double smooth_ratio = smoothstep(ratio);
+    
+    // Compute positions and velocities
+    for (const auto& [joint, dist] : distances) {
+        auto start_it = start_pos.find(joint);
+        if (start_it == start_pos.end()) continue;
+        
+        // Position: start + distance * smoothstep(ratio)
+        positions[joint] = start_it->second + dist * smooth_ratio;
+        
+        // Velocity: 6t(1-t) / T (only if still moving)
+        if (ratio < 1.0 && T > 0) {
+            velocities[joint] = dist * smoothstepVelocity(ratio, T);
+        } else {
+            velocities[joint] = 0.0;
+        }
+    }
+    
+    return {positions, velocities};
+}
+
+
+uint32_t ArmController::calculateCrc(const void* data, size_t len) {
+    (void)data; (void)len;
+    return 0;  // Using get_crc() instead
+}
+
+}  // namespace arm_controller
+
+// =============================================================================
+// Main
+// =============================================================================
+int main(int argc, char* argv[])
+{
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<arm_controller::ArmController>();
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}

@@ -1,0 +1,274 @@
+#include "core/FaceDetector.hpp"
+#include "utils/Logger.hpp"
+#include <opencv2/core/cuda.hpp>
+#include <cmath>
+
+namespace shakal {
+
+// Runtime GPU detection
+static bool hasGpuSupport() {
+    try {
+        int count = cv::cuda::getCudaEnabledDeviceCount();
+        return count > 0;
+    } catch (...) {
+        return false;
+    }
+}
+
+FaceDetector::FaceDetector()
+    : input_size_(640, 640)
+    , frame_size_(640, 640)
+    , conf_threshold_(0.5f)
+    , nms_threshold_(0.3f)
+    , initialized_(false)
+    , using_gpu_(false) {
+}
+
+FaceDetector::~FaceDetector() = default;
+
+bool FaceDetector::init(const std::string& model_path,
+                         const cv::Size& input_size,
+                         float conf_threshold,
+                         float nms_threshold) {
+    try {
+        input_size_ = input_size;
+        frame_size_ = input_size;
+        conf_threshold_ = conf_threshold;
+        nms_threshold_ = nms_threshold;
+
+        // Load ONNX model
+        net_ = cv::dnn::readNetFromONNX(model_path);
+        if (net_.empty()) {
+            LOG_ERROR("Failed to load YuNet model: " + model_path);
+            return false;
+        }
+
+        // Runtime GPU detection with automatic CPU fallback
+        using_gpu_ = false;
+        if (hasGpuSupport()) {
+            try {
+                net_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+                net_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+
+                // Test inference to verify CUDA works
+                cv::Mat dummy = cv::Mat::zeros(input_size_, CV_8UC3);
+                cv::Mat blob = preprocess(dummy);
+                net_.setInput(blob);
+                std::vector<std::string> output_names = net_.getUnconnectedOutLayersNames();
+                std::vector<cv::Mat> outputs;
+                net_.forward(outputs, output_names);
+
+                using_gpu_ = true;
+                LOG_INFO("FaceDetector: GPU (CUDA) backend active");
+            } catch (const cv::Exception& e) {
+                LOG_WARN("CUDA init failed for detector, falling back to CPU: " + std::string(e.what()));
+                // Reload model for CPU
+                net_ = cv::dnn::readNetFromONNX(model_path);
+            }
+        }
+
+        if (!using_gpu_) {
+            net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
+            net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+            LOG_INFO("FaceDetector: CPU backend active");
+        }
+
+        initialized_ = true;
+        LOG_INFO("FaceDetector initialized: " + model_path);
+        return true;
+
+    } catch (const cv::Exception& e) {
+        LOG_ERROR("OpenCV exception: " + std::string(e.what()));
+        return false;
+    }
+}
+
+cv::Mat FaceDetector::preprocess(const cv::Mat& frame) {
+    cv::Mat blob;
+    cv::dnn::blobFromImage(frame, blob, 1.0, input_size_, cv::Scalar(), true, false);
+    return blob;
+}
+
+std::vector<FaceInfo> FaceDetector::postprocess(const std::vector<cv::Mat>& outputs, const cv::Size& frame_size) {
+    std::vector<FaceInfo> faces;
+    std::vector<cv::Rect> boxes;
+    std::vector<float> confidences;
+    std::vector<std::vector<cv::Point2f>> all_landmarks;
+
+    // Scale factors from input_size to frame_size
+    float scale_x = static_cast<float>(frame_size.width) / input_size_.width;
+    float scale_y = static_cast<float>(frame_size.height) / input_size_.height;
+
+    // YuNet strides
+    std::vector<int> strides = {8, 16, 32};
+
+    // Organize outputs by channel count and size
+    // Model outputs: cls_8/16/32 (1ch), obj_8/16/32 (1ch), bbox_8/16/32 (4ch), kps_8/16/32 (10ch)
+    std::vector<cv::Mat> cls_list, obj_list, bbox_list, kps_list;
+
+    for (const auto& out : outputs) {
+        int n = out.size[1];  // number of anchors
+        int c = out.size[2];  // channels
+
+        cv::Mat reshaped = out.reshape(1, n);
+
+        if (c == 4) {
+            bbox_list.push_back(reshaped);
+        } else if (c == 10) {
+            kps_list.push_back(reshaped);
+        } else if (c == 1) {
+            // First 3 are cls, next 3 are obj
+            if (cls_list.size() < 3) {
+                cls_list.push_back(reshaped);
+            } else {
+                obj_list.push_back(reshaped);
+            }
+        }
+    }
+
+    // Sort by rows (descending) to get stride order: 8 (6400), 16 (1600), 32 (400)
+    auto sortByRows = [](std::vector<cv::Mat>& mats) {
+        std::sort(mats.begin(), mats.end(), [](const cv::Mat& a, const cv::Mat& b) {
+            return a.rows > b.rows;
+        });
+    };
+    sortByRows(cls_list);
+    sortByRows(obj_list);
+    sortByRows(bbox_list);
+    sortByRows(kps_list);
+
+    // Process each scale
+    int anchor_idx = 0;
+    for (size_t scale_idx = 0; scale_idx < strides.size(); ++scale_idx) {
+        int stride = strides[scale_idx];
+        int feat_h = input_size_.height / stride;
+        int feat_w = input_size_.width / stride;
+
+        if (scale_idx >= bbox_list.size()) continue;
+
+        const cv::Mat& cls = cls_list[scale_idx];
+        const cv::Mat& obj = obj_list.size() > scale_idx ? obj_list[scale_idx] : cv::Mat();
+        const cv::Mat& bbox = bbox_list[scale_idx];
+        const cv::Mat& kps = kps_list.size() > scale_idx ? kps_list[scale_idx] : cv::Mat();
+
+        for (int r = 0; r < feat_h; ++r) {
+            for (int c = 0; c < feat_w; ++c) {
+                int idx = r * feat_w + c;
+
+                // Score = sqrt(cls * obj) as per OpenCV source
+                float cls_score = cls.at<float>(idx, 0);
+                float obj_score = obj.empty() ? 1.0f : obj.at<float>(idx, 0);
+                float score = std::sqrt(cls_score * obj_score);
+
+                if (score < conf_threshold_) {
+                    continue;
+                }
+
+                // Decode bbox (OpenCV YuNet format - NO variance, NO prior width)
+                // cx = (c + bbox[0]) * stride
+                // cy = (r + bbox[1]) * stride
+                // w = exp(bbox[2]) * stride
+                // h = exp(bbox[3]) * stride
+                float cx = (c + bbox.at<float>(idx, 0)) * stride;
+                float cy = (r + bbox.at<float>(idx, 1)) * stride;
+                float w = std::exp(bbox.at<float>(idx, 2)) * stride;
+                float h = std::exp(bbox.at<float>(idx, 3)) * stride;
+
+                // Convert to corner format and scale to frame coords
+                float x1 = (cx - w / 2) * scale_x;
+                float y1 = (cy - h / 2) * scale_y;
+                float bw = w * scale_x;
+                float bh = h * scale_y;
+
+                // Clamp to frame bounds
+                x1 = std::max(0.0f, x1);
+                y1 = std::max(0.0f, y1);
+                bw = std::min(bw, static_cast<float>(frame_size.width) - x1);
+                bh = std::min(bh, static_cast<float>(frame_size.height) - y1);
+
+                if (bw <= 0 || bh <= 0) continue;
+
+                boxes.emplace_back(
+                    static_cast<int>(x1),
+                    static_cast<int>(y1),
+                    static_cast<int>(bw),
+                    static_cast<int>(bh)
+                );
+                confidences.push_back(score);
+
+                // Decode 5 landmarks
+                // lx = (c + kps[n*2]) * stride
+                // ly = (r + kps[n*2+1]) * stride
+                std::vector<cv::Point2f> landmarks(5);
+                if (!kps.empty()) {
+                    for (int n = 0; n < 5; ++n) {
+                        float lx = (c + kps.at<float>(idx, n * 2)) * stride * scale_x;
+                        float ly = (r + kps.at<float>(idx, n * 2 + 1)) * stride * scale_y;
+                        landmarks[n] = cv::Point2f(lx, ly);
+                    }
+                }
+                all_landmarks.push_back(landmarks);
+            }
+        }
+    }
+
+    // Apply NMS
+    std::vector<int> indices;
+    if (!boxes.empty()) {
+        cv::dnn::NMSBoxes(boxes, confidences, conf_threshold_, nms_threshold_, indices);
+    }
+
+    // Build final result
+    for (int idx : indices) {
+        FaceInfo face;
+        face.bbox = boxes[idx];
+        face.confidence = confidences[idx];
+        face.landmarks = all_landmarks[idx];
+        faces.push_back(face);
+    }
+
+    return faces;
+}
+
+std::vector<FaceInfo> FaceDetector::detect(const cv::Mat& frame) {
+    std::vector<FaceInfo> faces;
+
+    if (!initialized_ || frame.empty()) {
+        return faces;
+    }
+
+    // Store frame size for scaling
+    frame_size_ = frame.size();
+
+    // Preprocess
+    cv::Mat blob = preprocess(frame);
+
+    // Forward pass - get all outputs
+    net_.setInput(blob);
+    std::vector<std::string> output_names = net_.getUnconnectedOutLayersNames();
+    std::vector<cv::Mat> outputs;
+    net_.forward(outputs, output_names);
+
+    if (outputs.empty()) {
+        return faces;
+    }
+
+    // Postprocess
+    faces = postprocess(outputs, frame_size_);
+
+    return faces;
+}
+
+void FaceDetector::setConfidenceThreshold(float threshold) {
+    conf_threshold_ = threshold;
+}
+
+void FaceDetector::setNMSThreshold(float threshold) {
+    nms_threshold_ = threshold;
+}
+
+void FaceDetector::setInputSize(const cv::Size& size) {
+    input_size_ = size;
+}
+
+}

@@ -1,0 +1,29 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+log/
+
+# Temp
+*.tmp
+.cache/
+
+# Docker volumes data (keep structure, ignore data)
+# Don't ignore models - they're needed
+

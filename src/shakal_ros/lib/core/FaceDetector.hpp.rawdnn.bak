@@ -1,0 +1,53 @@
+#pragma once
+
+#include <opencv2/opencv.hpp>
+#include <opencv2/dnn.hpp>
+#include <vector>
+#include <string>
+
+namespace shakal {
+
+struct FaceInfo {
+    cv::Rect bbox;
+    float confidence;
+    std::vector<cv::Point2f> landmarks;
+};
+
+class FaceDetector {
+public:
+    FaceDetector();
+    ~FaceDetector();
+
+    bool init(const std::string& model_path,
+              const cv::Size& input_size,
+              float conf_threshold = 0.5f,
+              float nms_threshold = 0.4f);
+
+    std::vector<FaceInfo> detect(const cv::Mat& frame);
+
+    void setConfidenceThreshold(float threshold);
+    void setNMSThreshold(float threshold);
+    void setInputSize(const cv::Size& size);
+
+    bool isInitialized() const { return initialized_; }
+
+private:
+    cv::dnn::Net net_;
+    cv::Size input_size_;
+    cv::Size frame_size_;
+    float conf_threshold_;
+    float nms_threshold_;
+    bool initialized_;
+    bool using_gpu_;
+
+    // Padding info for aspect ratio preservation
+    int pad_x_ = 0;
+    int pad_y_ = 0;
+    int padded_size_ = 0;
+
+    // YuNet specific
+    cv::Mat preprocess(const cv::Mat& frame);
+    std::vector<FaceInfo> postprocess(const std::vector<cv::Mat>& outputs, const cv::Size& frame_size);
+};
+
+}
