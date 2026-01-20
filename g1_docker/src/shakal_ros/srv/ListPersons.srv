@@ -1,0 +1,6 @@
+# List all enrolled persons
+
+---
+string[] names
+int32[] embedding_counts
+int32 total_persons

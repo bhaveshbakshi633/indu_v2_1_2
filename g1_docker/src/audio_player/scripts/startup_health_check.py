@@ -3,6 +3,8 @@
 Startup Health Check - Check external services and announce status via G1 speaker.
 Creates /tmp/startup_complete file when done to signal health to docker-compose.
 Stays running (doesn't exit) so other services can depend on it.
+
+GAIN can be set via environment variable: GAIN=0.5
 """
 
 import os
@@ -38,6 +40,11 @@ class StartupHealthCheck:
         self.max_retries = 3
         self.retry_delay = 10
         
+        # Environment variable se gain lo, default 0.5
+        self.gain = float(os.environ.get('GAIN', '0.5'))
+        self.gain = max(0.1, min(6.0, self.gain))  # Clamp 0.1-6.0
+        logger.info(f"Gain set to: {self.gain} (from GAIN env variable)")
+        
     def _load_config(self):
         """Config file load karo"""
         try:
@@ -69,7 +76,7 @@ class StartupHealthCheck:
         """Announcer initialize karo"""
         # Config se chatterbox settings lo
         chatterbox_cfg = self.config.get('services', {}).get('chatterbox', {})
-        host = chatterbox_cfg.get('host', '192.168.123.169')
+        host = chatterbox_cfg.get('host', '172.16.6.19')
         port = chatterbox_cfg.get('port', 8000)
         
         self.announcer = AnnouncerTTS(
@@ -77,9 +84,9 @@ class StartupHealthCheck:
             chatterbox_port=port,
             audio_receiver_url='http://localhost:5050/play_audio',
             edge_voice='en-IN-NeerjaExpressiveNeural',
-            gain=4.0
+            gain=self.gain
         )
-        logger.info(f"Announcer initialized (Chatterbox: {host}:{port})")
+        logger.info(f"Announcer initialized (Chatterbox: {host}:{port}, Gain: {self.gain})")
     
     def _announce(self, message):
         """G1 speaker pe announce karo"""
@@ -110,7 +117,7 @@ class StartupHealthCheck:
         return False
     
     def _ssh_restart_service(self, service_config):
-        """SSH se service restart karo"""
+        """SSH se service restart karo - with timeout for background commands"""
         ssh_cfg = service_config.get('ssh', {})
         host = service_config.get('host')
         user = ssh_cfg.get('user')
@@ -131,14 +138,19 @@ class StartupHealthCheck:
             # Stop first if stop_cmd exists
             if stop_cmd:
                 logger.info(f"Stopping {name}...")
-                stdin, stdout, stderr = client.exec_command(stop_cmd)
-                stdout.read()
+                stdin, stdout, stderr = client.exec_command(stop_cmd, timeout=10)
+                try:
+                    stdout.channel.recv(1024)
+                except:
+                    pass
                 time.sleep(2)
             
-            # Start service
+            # Start service - use channel with timeout for background commands
             logger.info(f"Starting {name}...")
-            stdin, stdout, stderr = client.exec_command(start_cmd)
-            stdout.read()
+            stdin, stdout, stderr = client.exec_command(start_cmd, timeout=5)
+            # Don't block on stdout.read() - background commands won't return
+            # Just wait briefly for command to be sent
+            time.sleep(1)
             
             client.close()
             return True
@@ -194,6 +206,7 @@ class StartupHealthCheck:
         """Main health check sequence"""
         logger.info("="*50)
         logger.info("STARTUP HEALTH CHECK STARTED")
+        logger.info(f"Audio Gain: {self.gain}")
         logger.info("="*50)
         
         # Remove old marker

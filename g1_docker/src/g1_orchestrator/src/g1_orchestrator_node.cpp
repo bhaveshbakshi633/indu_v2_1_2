@@ -1,10 +1,16 @@
-// G1 Orchestrator Node - Non-blocking with manual state transitions
+// G1 Orchestrator Node - v3.0 (Voice Control Edition)
+// Non-blocking with manual state transitions
+// v2.9: Added FSM state broadcast for arm_controller coordination
+// v3.0: Added emergency_stop subscriber for voice-driven control
 
 #include <rclcpp/rclcpp.hpp>
 #include <orchestrator_msgs/msg/action_command.hpp>
 #include <unitree_hg/msg/low_state.hpp>
 #include <unitree_api/msg/request.hpp>
 #include <unitree_api/msg/response.hpp>
+#include <std_msgs/msg/int32.hpp>   // v2.9: FSM state broadcast
+#include <std_msgs/msg/bool.hpp>    // v3.0: Emergency stop
+#include <std_msgs/msg/string.hpp>  // v3.0: Arm cancel command
 #include "g1/g1_loco_client.hpp"
 
 #include <memory>
@@ -40,7 +46,21 @@ public:
         api_request_pub_ = this->create_publisher<unitree_api::msg::Request>(
             "/api/sport/request", 10);
 
-        RCLCPP_INFO(this->get_logger(), "G1 Orchestrator ready!");
+        // v2.9: FSM state broadcast - arm_controller subscribes to this
+        fsm_state_pub_ = this->create_publisher<std_msgs::msg::Int32>("/fsm_state", 10);
+
+        // v3.0: Arm cancel command publisher
+        arm_cmd_pub_ = this->create_publisher<std_msgs::msg::String>("/arm_ctrl/command", 10);
+
+        // v3.0: EMERGENCY STOP subscriber - highest priority, reliable QoS
+        // Voice fast-path se aata hai, immediately DAMP karo
+        auto emergency_qos = rclcpp::QoS(1).reliable();
+        emergency_stop_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+            "/emergency_stop",
+            emergency_qos,
+            std::bind(&G1Orchestrator::emergency_stop_callback, this, std::placeholders::_1));
+
+        RCLCPP_INFO(this->get_logger(), "G1 Orchestrator v3.0 (Voice Control) ready!");
     }
 
     ~G1Orchestrator()
@@ -56,12 +76,16 @@ private:
     rclcpp::Subscription<orchestrator_msgs::msg::ActionCommand>::SharedPtr action_sub_;
     rclcpp::Subscription<unitree_hg::msg::LowState>::SharedPtr lowstate_sub_;
     rclcpp::Subscription<unitree_api::msg::Response>::SharedPtr api_response_sub_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr emergency_stop_sub_;  // v3.0
     rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr api_request_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr fsm_state_pub_;  // v2.9
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr arm_cmd_pub_;   // v3.0
 
     std::atomic<bool> lowstate_received_{false};
     std::atomic<bool> init_complete_{false};
     std::atomic<bool> task_running_{false};
     std::atomic<bool> shutdown_flag_{false};
+    std::atomic<bool> task_cancel_requested_{false};  // v3.0: Emergency stop flag
     std::atomic<int> current_mode_machine_{0};
     
     std::mutex state_mutex_;
@@ -71,6 +95,35 @@ private:
     std::mutex response_mutex_;
 
     std::thread worker_thread_;
+
+    // v3.0: EMERGENCY STOP callback - immediate DAMP, no questions asked
+    void emergency_stop_callback(const std_msgs::msg::Bool::SharedPtr msg)
+    {
+        if (msg->data) {
+            RCLCPP_WARN(this->get_logger(), "===========================================");
+            RCLCPP_WARN(this->get_logger(), "   [EMERGENCY STOP] Voice fast-path triggered!");
+            RCLCPP_WARN(this->get_logger(), "===========================================");
+
+            // Step 1: Cancel any running task
+            task_cancel_requested_.store(true);
+
+            // Step 2: Broadcast FSM change to arm_controller (disable arms first)
+            broadcastFsmChange(1, "EMERGENCY_STOP");
+
+            // Step 3: Immediate DAMP - no delay
+            loco_client_->Damp();
+
+            // Step 4: Cancel arm motion
+            auto cancel_msg = std_msgs::msg::String();
+            cancel_msg.data = "cancel";
+            arm_cmd_pub_->publish(cancel_msg);
+
+            // Step 5: Stop any locomotion
+            loco_client_->StopMove();
+
+            RCLCPP_WARN(this->get_logger(), "[EMERGENCY STOP] Robot damped, motion stopped");
+        }
+    }
 
     void lowstate_callback(const unitree_hg::msg::LowState::SharedPtr msg)
     {
@@ -101,7 +154,7 @@ private:
         api_request_pub_->publish(req);
 
         auto start = std::chrono::steady_clock::now();
-        while (!shutdown_flag_) {
+        while (!shutdown_flag_ && !task_cancel_requested_) {  // v3.0: Check cancel flag
             {
                 std::lock_guard<std::mutex> lock(response_mutex_);
                 auto it = response_cache_.find(request_id);
@@ -133,7 +186,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "Verifying FSM -> %s (%d)...", name.c_str(), target);
         auto start = std::chrono::steady_clock::now();
         
-        while (!shutdown_flag_) {
+        while (!shutdown_flag_ && !task_cancel_requested_) {  // v3.0: Check cancel flag
             int fsm = -1;
             if (getFsmId(fsm) == 0 && fsm == target) {
                 RCLCPP_INFO(this->get_logger(), "FSM verified: %s (%d)", name.c_str(), fsm);
@@ -153,6 +206,9 @@ private:
 
     void action_callback(const orchestrator_msgs::msg::ActionCommand::SharedPtr msg)
     {
+        // v3.0: Clear cancel flag on new action
+        task_cancel_requested_.store(false);
+        
         RCLCPP_INFO(this->get_logger(), "Action: %s", msg->action_name.c_str());
 
         if (msg->action_name == "init") {
@@ -184,27 +240,38 @@ private:
             worker_thread_ = std::thread(&G1Orchestrator::execute_ready, this);
         }
         else if (msg->action_name == "status") {
-            std::thread([this]() {
+            if (worker_thread_.joinable()) worker_thread_.join();
+            worker_thread_ = std::thread([this]() {
                 int fsm = -1;
                 int ret = getFsmId(fsm);
                 RCLCPP_INFO(this->get_logger(), "=== STATUS ===");
                 RCLCPP_INFO(this->get_logger(), "FSM (API): %d (ret=%d)", fsm, ret);
                 RCLCPP_INFO(this->get_logger(), "mode_machine: %d", current_mode_machine_.load());
-                RCLCPP_INFO(this->get_logger(), "Init: %s, Task: %s", 
+                RCLCPP_INFO(this->get_logger(), "Init: %s, Task: %s",
                     init_complete_ ? "YES" : "NO",
                     task_running_ ? "RUNNING" : "IDLE");
-            }).detach();
+            });
         }
         else if (msg->action_name == "getfsm") {
-            std::thread([this]() {
+            if (worker_thread_.joinable()) worker_thread_.join();
+            worker_thread_ = std::thread([this]() {
                 int fsm = -1;
                 int ret = getFsmId(fsm);
                 RCLCPP_INFO(this->get_logger(), "GetFsmId: ret=%d, fsm=%d", ret, fsm);
-            }).detach();
+            });
         }
         else {
             RCLCPP_WARN(this->get_logger(), "Unknown: %s", msg->action_name.c_str());
         }
+    }
+
+    // v2.9: Broadcast FSM state change BEFORE sending command to robot
+    void broadcastFsmChange(int target_fsm, const std::string& reason)
+    {
+        RCLCPP_INFO(this->get_logger(), "[FSM_BROADCAST] Transitioning to FSM=%d (%s)", target_fsm, reason.c_str());
+        std_msgs::msg::Int32 msg;
+        msg.data = target_fsm;
+        fsm_state_pub_->publish(msg);
     }
 
     // Manual transitions with verification
@@ -213,6 +280,16 @@ private:
     {
         task_running_ = true;
         RCLCPP_INFO(this->get_logger(), ">>> DAMP (FSM 1)");
+
+        broadcastFsmChange(1, "DAMP");
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[DAMP] Cancelled by emergency stop");
+            task_running_ = false;
+            return;
+        }
+
         loco_client_->Damp();
         std::this_thread::sleep_for(std::chrono::seconds(1));
         verifyFsmState(1, "DAMP", 5);
@@ -223,6 +300,16 @@ private:
     {
         task_running_ = true;
         RCLCPP_INFO(this->get_logger(), ">>> ZERO_TORQUE (FSM 0)");
+
+        broadcastFsmChange(0, "ZERO_TORQUE");
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[ZERO_TORQUE] Cancelled by emergency stop");
+            task_running_ = false;
+            return;
+        }
+
         loco_client_->ZeroTorque();
         std::this_thread::sleep_for(std::chrono::seconds(1));
         verifyFsmState(0, "ZERO_TORQUE", 5);
@@ -233,8 +320,29 @@ private:
     {
         task_running_ = true;
         RCLCPP_INFO(this->get_logger(), ">>> STANDUP (FSM 4)");
+
+        broadcastFsmChange(4, "STANDUP");
+        std::this_thread::sleep_for(std::chrono::milliseconds(600));
+
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[STANDUP] Cancelled by emergency stop");
+            task_running_ = false;
+            return;
+        }
+
         loco_client_->StandUp();
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        
+        // v3.0: Check cancel during long standup
+        for (int i = 0; i < 10 && !task_cancel_requested_; ++i) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[STANDUP] Interrupted by emergency stop");
+            task_running_ = false;
+            return;
+        }
+        
         verifyFsmState(4, "STANDUP", 5);
         task_running_ = false;
     }
@@ -243,6 +351,15 @@ private:
     {
         task_running_ = true;
         RCLCPP_INFO(this->get_logger(), ">>> READY (FSM 801)");
+
+        broadcastFsmChange(801, "READY");
+
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[READY] Cancelled by emergency stop");
+            task_running_ = false;
+            return;
+        }
+
         loco_client_->SetFsmId(801);
         std::this_thread::sleep_for(std::chrono::seconds(3));
         verifyFsmState(801, "READY", 5);
@@ -259,7 +376,7 @@ private:
         // Step 1: Check communication
         RCLCPP_INFO(this->get_logger(), "[BOOT] Step 1: Checking...");
         std::this_thread::sleep_for(std::chrono::seconds(2));
-        if (shutdown_flag_) { task_running_ = false; return; }
+        if (shutdown_flag_ || task_cancel_requested_) { task_running_ = false; return; }
         
         if (!lowstate_received_) {
             RCLCPP_ERROR(this->get_logger(), "[BOOT] FAILED - no lowstate");
@@ -272,7 +389,7 @@ private:
         RCLCPP_INFO(this->get_logger(), "[BOOT] Current FSM: %d", fsm);
 
         // Step 2: DAMP
-        if (shutdown_flag_) { task_running_ = false; return; }
+        if (shutdown_flag_ || task_cancel_requested_) { task_running_ = false; return; }
         RCLCPP_INFO(this->get_logger(), "[BOOT] Step 2: DAMP...");
         loco_client_->Damp();
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -283,10 +400,22 @@ private:
         }
 
         // Step 3: StandUp
-        if (shutdown_flag_) { task_running_ = false; return; }
+        if (shutdown_flag_ || task_cancel_requested_) { task_running_ = false; return; }
         RCLCPP_INFO(this->get_logger(), "[BOOT] Step 3: StandUp (10s)...");
         loco_client_->StandUp();
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        
+        // v3.0: Check cancel during standup
+        for (int i = 0; i < 10 && !task_cancel_requested_; ++i) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        
+        if (task_cancel_requested_) {
+            RCLCPP_WARN(this->get_logger(), "[BOOT] Interrupted by emergency stop");
+            loco_client_->Damp();
+            task_running_ = false;
+            return;
+        }
+        
         if (!verifyFsmState(4, "STANDUP", 5)) {
             RCLCPP_ERROR(this->get_logger(), "[BOOT] StandUp failed! Damping...");
             loco_client_->Damp();
@@ -295,7 +424,7 @@ private:
         }
 
         // Step 4: Ready (801)
-        if (shutdown_flag_) { task_running_ = false; return; }
+        if (shutdown_flag_ || task_cancel_requested_) { task_running_ = false; return; }
         RCLCPP_INFO(this->get_logger(), "[BOOT] Step 4: Ready (801)...");
         loco_client_->SetFsmId(801);
         std::this_thread::sleep_for(std::chrono::seconds(3));

@@ -1,0 +1,7 @@
+# Set OBSBOT camera zoom
+
+float32 zoom
+---
+bool success
+string message
+float32 current_zoom

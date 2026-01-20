@@ -1,187 +1,266 @@
-# Indu V2.1.2 - G1 Robot Voice Assistant System
+# INDU Voice-Controlled Humanoid Robot System v2.1.6
 
-Complete robotics voice assistant system for Unitree G1 robot with arm control, orchestration, and TTS speaker output.
+Complete voice control system for G1 humanoid robot with distributed architecture across multiple PCs.
 
-## Architecture
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              LAPTOP                                         │
+│                           NETWORK: 172.16.x.x                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
-│  │  Chatterbox TTS │    │    brain_v2     │    │  Whisper Server │         │
-│  │  (localhost:8000)│◄──│  Flask Server   │◄──│  (STT)          │         │
-│  └─────────────────┘    │  - VAD Pipeline │    └─────────────────┘         │
-│                         │  - RAG Agent    │                                 │
-│                         │  - Ollama LLM   │                                 │
-│                         └────────┬────────┘                                 │
-│                                  │ HTTP POST                                │
-└──────────────────────────────────┼──────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         G1 ROBOT (Docker)                                   │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
-│  │ audio_receiver  │───▶│ tts_audio_player│───▶│   G1 Speaker    │         │
-│  │ (Flask:5050)    │    │ (C++ AudioClient)│    │                 │         │
-│  └─────────────────┘    └─────────────────┘    └─────────────────┘         │
-│           │                                                                 │
-│           │ ROS2 Topics                                                     │
-│           ▼                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐                                │
-│  │  arm_controller │    │  g1_orchestrator│                                │
-│  │  - Arm movements│    │  - Init/Damp    │                                │
-│  │  - Teach mode   │    │  - Stand up     │                                │
-│  │  - Recording    │    │  - FSM control  │                                │
-│  └─────────────────┘    └─────────────────┘                                │
+│                                                                             │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌───────────┐ │
+│  │   Isaac PC   │    │    PC "b"    │    │   Main PC    │    │  G1 Robot │ │
+│  │ 172.16.4.226 │    │ 172.16.4.250 │    │ 172.16.6.19  │    │172.16.2.242│ │
+│  ├──────────────┤    ├──────────────┤    ├──────────────┤    ├───────────┤ │
+│  │              │    │              │    │              │    │           │ │
+│  │   Ollama     │    │   Whisper    │    │  brain_v2    │    │  Docker   │ │
+│  │   :11434     │    │   :8001      │    │  :8080       │    │  Compose  │ │
+│  │              │    │              │    │              │    │           │ │
+│  │  llama3.1:8b │    │  STT Server  │    │  Chatterbox  │    │ orchestr. │ │
+│  │              │    │              │    │  :8000       │    │ arm_ctrl  │ │
+│  │              │    │              │    │              │    │ http_brdg │ │
+│  │              │    │              │    │              │    │  :5051    │ │
+│  └──────────────┘    └──────────────┘    └──────────────┘    └───────────┘ │
+│                                                                             │
+│  Voice Flow: Mic → brain_v2 → Whisper → Intent → Ollama → Chatterbox → G1  │
+│  Action Flow: brain_v2 → HTTP :5051 → http_action_bridge → ROS2 → Robot    │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+## Components Overview
+
+| Component | Machine | IP | Port | Purpose |
+|-----------|---------|-----|------|---------|
+| Ollama LLM | Isaac PC | 172.16.4.226 | 11434 | Language model inference |
+| Whisper STT | PC "b" | 172.16.4.250 | 8001 | Speech-to-text |
+| Chatterbox TTS | Main PC | 172.16.6.19 | 8000 | Text-to-speech |
+| brain_v2 | Main PC | 172.16.6.19 | 8080 | Voice assistant server |
+| G1 Audio Receiver | G1 Robot | 172.16.2.242 | 5050 | Audio playback |
+| HTTP Action Bridge | G1 Robot | 172.16.2.242 | 5051 | Voice command relay |
 
 ## Directory Structure
 
 ```
 indu_v2_1_2/
-├── brain_v2/                    # Laptop - Voice Assistant
-│   ├── server.py                # Main Flask server
-│   ├── config.json              # Configuration
-│   ├── indu_rag.py              # RAG agent (LangChain + FAISS)
-│   ├── indu_knowledge_base.txt  # Knowledge base
-│   ├── indu_system_prompt.txt   # LLM system prompt
-│   ├── chatterbox_tts_client.py # Chatterbox TTS client
-│   ├── whisper_server.py        # Whisper STT server
-│   ├── vad_pipeline/            # Voice Activity Detection
-│   ├── templates/               # Web UI
-│   └── static/                  # Static assets
+├── brain_v2/              # Voice assistant server (Main PC)
+│   ├── server.py          # Main Flask/WebSocket server
+│   ├── intent_reasoner.py # Voice command detection
+│   ├── action_registry.py # Robot action definitions
+│   ├── stop_fast_path.py  # Emergency stop detection
+│   ├── voice_bridge.py    # ROS2 bridge (legacy)
+│   ├── indu_rag.py        # RAG agent for knowledge
+│   ├── config.json.example # Configuration template
+│   ├── templates/         # Web UI
+│   └── static/            # Static assets
 │
-└── g1_docker/                   # G1 Robot - Docker deployment
-    ├── Dockerfile
-    ├── docker-compose.yml
-    └── src/
-        ├── arm_controller/      # Arm control (v2.8)
-        │   ├── src/arm_controller_node.cpp
-        │   └── include/arm_controller/arm_controller.hpp
-        ├── g1_orchestrator/     # Robot orchestration
-        │   ├── src/g1_orchestrator_node.cpp
-        │   └── include/         # Unitree client APIs
-        ├── audio_player/        # TTS audio bridge
-        │   ├── src/tts_audio_player.cpp
-        │   └── scripts/audio_receiver.py
-        ├── orchestrator_msgs/   # Custom ROS2 messages
-        ├── unitree_api/         # Unitree API interfaces
-        ├── unitree_hg/          # Unitree HG messages
-        └── unitree_go/          # Unitree Go messages
+├── g1_docker/             # G1 Robot Docker deployment
+│   ├── docker-compose.yml # All services definition
+│   ├── Dockerfile         # Base image build
+│   ├── config/            # Robot configuration
+│   └── src/               # ROS2 packages
+│       ├── g1_orchestrator/     # Robot state machine
+│       ├── arm_controller/      # Arm movements
+│       ├── http_action_bridge/  # HTTP-to-ROS2 bridge
+│       ├── audio_player/        # TTS audio output
+│       ├── action_gatekeeper/   # Safety validation
+│       └── ...
+│
+├── whisper_server/        # Whisper STT server (PC "b")
+│   └── whisper_server.py
+│
+├── chatterbox_tts/        # Chatterbox TTS server (Main PC)
+│   └── tts_server.py
+│
+└── scripts/               # Utility scripts
+    ├── g1_services.sh     # Service manager (Main PC)
+    └── launch_version.sh  # Version selector (G1)
 ```
 
 ---
 
-## Quick Start
+## Setup Instructions
 
-### 1. G1 Robot Setup
+### Prerequisites
+
+- Ubuntu 20.04+ on all PCs
+- NVIDIA GPU on Isaac PC (for Ollama)
+- Python 3.10+
+- Docker 26+ on G1 robot
+- All PCs on same network (172.16.x.x)
+
+---
+
+### 1. Isaac PC - Ollama LLM (172.16.4.226)
+
+**SSH:** `ssh isaac@172.16.4.226` (password: `7410`)
 
 ```bash
-# SSH to G1
-sshpass -p '123' ssh unitree@192.168.123.164
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
 
-# Navigate to deployment folder
-cd ~/deployed/v2_1
+# Configure to listen on all interfaces
+sudo tee /etc/systemd/system/ollama.service << 'EOF'
+[Unit]
+Description=Ollama Service
+After=network-online.target
 
-# Build Docker image
-sudo docker build -t g1_orchestrator:v2.10 .
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+Environment="OLLAMA_HOST=0.0.0.0:11434"
 
-# Start all services
-sudo docker-compose up -d
+[Install]
+WantedBy=default.target
+EOF
 
-# OR start individually:
-sudo docker run -d --name g1_orchestrator --network host --privileged \
-    g1_orchestrator:v2.10 ros2 run g1_orchestrator g1_orchestrator_node
+# Reload and start
+sudo systemctl daemon-reload
+sudo systemctl enable ollama
+sudo systemctl start ollama
 
-sudo docker run -d --name arm_controller --network host --privileged \
-    g1_orchestrator:v2.10 ros2 run arm_controller arm_controller_node
+# Pull the model
+ollama pull llama3.1:8b
 
-sudo docker run -d --name tts_audio_player --network host --privileged \
-    g1_orchestrator:v2.10 ros2 run audio_player tts_audio_player
-
-sudo docker run -d --name audio_receiver --network host --privileged \
-    g1_orchestrator:v2.10 ros2 run audio_player audio_receiver
+# Verify
+curl http://localhost:11434/api/tags
 ```
 
-### 2. Laptop - Chatterbox TTS Server
+---
+
+### 2. PC "b" - Whisper STT Server (172.16.4.250)
+
+**SSH:** `ssh b@172.16.4.250` (password: `1997`)
 
 ```bash
+# Create directory
+mkdir -p ~/Whisper
+cd ~/Whisper
+
+# Create virtual environment
+python3 -m venv whisper_venv
+source whisper_venv/bin/activate
+
+# Install dependencies
+pip install flask faster-whisper numpy
+
+# Copy whisper_server.py from this repo
+# (from Main PC): scp whisper_server/whisper_server.py b@172.16.4.250:~/Whisper/
+
+# Run server
+nohup python3 whisper_server.py > /tmp/whisper.log 2>&1 &
+
+# Verify
+curl http://localhost:8001/health
+```
+
+---
+
+### 3. Main PC - Chatterbox TTS (172.16.6.19)
+
+```bash
+# Create directory
+mkdir -p ~/Music/chatterbox
 cd ~/Music/chatterbox
+
+# Create virtual environment
+python3 -m venv .venv
 source .venv/bin/activate
-python tts_server.py
+
+# Install Chatterbox (follow official instructions at github.com/resemble-ai/chatterbox)
+pip install chatterbox-tts torch torchaudio
+
+# Copy tts_server.py from this repo
+cp /path/to/repo/chatterbox_tts/tts_server.py ~/Music/chatterbox/
+
+# Run server
+nohup python3 tts_server.py > /tmp/chatterbox.log 2>&1 &
 
 # Verify
 curl http://localhost:8000/health
 ```
 
-### 3. Laptop - Brain V2 Server
+---
+
+### 4. Main PC - brain_v2 Voice Assistant (172.16.6.19)
 
 ```bash
-cd brain_v2
-pip install -r requirements.txt
-python server.py
+# Setup directory
+mkdir -p ~/Downloads
+cd ~/Downloads
+cp -r /path/to/repo/brain_v2 indu_brain_v2_1_6
+cd indu_brain_v2_1_6
 
-# Open browser: http://localhost:8080
+# Create config from example
+cp config.json.example config.json
+
+# Edit config.json (see Configuration section below)
+
+# Generate SSL certificates (for HTTPS microphone access)
+openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem \
+  -days 365 -nodes -subj "/CN=localhost"
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Source ROS2 (optional, for legacy voice_bridge)
+source /opt/ros/humble/setup.bash
+
+# Run server
+python3 server.py
 ```
 
 ---
 
-## G1 Robot Commands
+### 5. G1 Robot - Docker Services (172.16.2.242)
 
-### Orchestrator Commands
+**SSH:** `ssh unitree@172.16.2.242` (password: `123`)
 
 ```bash
-# Enter Docker container
-sudo docker exec -it g1_orchestrator bash
-source /ros2_ws/install/setup.bash
+# Copy g1_docker folder to G1
+# (from Main PC):
+scp -r /path/to/repo/g1_docker unitree@172.16.2.242:~/deployed/v2_1_6
 
-# Get FSM state
-ros2 topic pub --once /orchestrator/action_command orchestrator_msgs/msg/ActionCommand \
-    '{action_name: "getfsm", parameters: [], priority: 1}'
+# On G1:
+cd ~/deployed/v2_1_6
 
-# Init robot (stand up)
-ros2 topic pub --once /orchestrator/action_command orchestrator_msgs/msg/ActionCommand \
-    '{action_name: "init", parameters: [], priority: 1}'
+# Install docker compose v2 (if not already installed)
+mkdir -p ~/.docker/cli-plugins
+curl -SL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-aarch64 \
+  -o ~/.docker/cli-plugins/docker-compose
+chmod +x ~/.docker/cli-plugins/docker-compose
 
-# Damp robot (safe shutdown)
-ros2 topic pub --once /orchestrator/action_command orchestrator_msgs/msg/ActionCommand \
-    '{action_name: "damp", parameters: [], priority: 1}'
+# Verify
+docker compose version  # Should show v2.24.0
+
+# Build Docker image (first time only, takes ~10 mins)
+docker build -t g1_orchestrator:v2.13 .
+
+# Start all services
+docker compose up -d
+
+# Verify all services running
+docker compose ps
+curl http://localhost:5050/health  # Audio receiver
+curl http://localhost:5051/health  # HTTP action bridge
 ```
 
-### Arm Controller Commands
+---
+
+### 6. Scripts Setup (Main PC)
 
 ```bash
-# Enter Docker container
-sudo docker exec -it arm_controller bash
-source /ros2_ws/install/setup.bash
+# Copy service manager script
+mkdir -p ~/scripts
+cp /path/to/repo/scripts/g1_services.sh ~/scripts/
+chmod +x ~/scripts/g1_services.sh
 
-# Init arms (stiffness ramp)
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'init_arms'"
-
-# Move to home position
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'move_home'"
-
-# Move to custom position
-ros2 topic pub --once /arm_ctrl/command std_msgs/String \
-    "data: 'move_to:{\"left\": [0.3, 0.2, 0.0, 0.8, 0.0, 0.0, 0.0], \"right\": [0.3, -0.2, 0.0, 0.8, 0.0, 0.0, 0.0]}'"
-
-# Stop motion
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'stop'"
-
-# Cancel task
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'cancel'"
-
-# Teach mode
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'enter_teach'"
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'start_recording'"
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'stop_recording'"
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'play'"
-ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'exit_teach'"
+# Test
+~/scripts/g1_services.sh status all
 ```
 
 ---
@@ -192,145 +271,231 @@ ros2 topic pub --once /arm_ctrl/command std_msgs/String "data: 'exit_teach'"
 
 ```json
 {
-  "g1_audio": {
-    "enabled": true,
-    "host": "192.168.123.164",
-    "port": 5050,
-    "gain": 4.0
+  "ollama_host": "172.16.4.226",
+  "ollama_port": 11434,
+  "model": "llama3.1:8b",
+  "stt": {
+    "backend": "whisper_server",
+    "whisper_host": "172.16.4.250",
+    "whisper_port": 8001
   },
-  "tts_backend": "chatterbox",
-  "stt_backend": "whisper_server",
   "tts": {
     "backend": "chatterbox",
-    "chatterbox": {
-      "host": "127.0.0.1",
-      "port": 8000,
-      "fallback": "edge",
-      "fallback_voice": "en-IN-NeerjaExpressiveNeural"
-    }
+    "host": "127.0.0.1",
+    "port": 8000
   },
-  "stt": {
-    "whisper_server": {
-      "host": "172.16.4.226",
-      "port": 8001
-    }
+  "g1_audio": {
+    "enabled": true,
+    "host": "172.16.2.242",
+    "port": 5050,
+    "gain": 1.0
   },
-  "llm": {
-    "model": "llama3.1:8b",
-    "use_rag": true
+  "vad": {
+    "threshold": 0.5,
+    "silence_timeout": 1.5
   }
 }
 ```
 
-**Key Settings:**
 | Setting | Description |
 |---------|-------------|
-| `g1_audio.gain` | Audio amplification (1.0 - 5.0) |
-| `g1_audio.host` | G1 robot IP |
-| `tts_backend` | TTS engine: "chatterbox" or "edge" |
-| `stt_backend` | STT engine: "whisper_server" or "google" |
+| `ollama_host` | Isaac PC IP for LLM |
+| `stt.whisper_host` | PC "b" IP for STT |
+| `g1_audio.host` | G1 robot IP for audio |
+| `g1_audio.gain` | Audio amplification (0.5 - 2.0) |
 
 ---
 
-## Audio Pipeline Test
+## Running the System
+
+### Start Order
+
+1. **Isaac PC**: Ollama (auto-starts via systemd)
+2. **PC "b"**: Whisper server
+3. **Main PC**: Chatterbox TTS
+4. **G1 Robot**: Docker services
+5. **Main PC**: brain_v2 server
+
+### Quick Start (from Main PC)
 
 ```bash
-# From laptop - test TTS to G1 speaker
-python3 << 'EOF'
-import requests, soundfile as sf, numpy as np
-from scipy import signal
+# Start all external services
+~/scripts/g1_services.sh start all
 
-# Generate with Chatterbox
-resp = requests.get("http://127.0.0.1:8000/tts",
-    params={"text": "Hello from Chatterbox!"}, timeout=60)
-open("/tmp/test.wav", "wb").write(resp.content)
+# Check status
+~/scripts/g1_services.sh status all
 
-# Process audio
-data, sr = sf.read("/tmp/test.wav")
-if len(data.shape) > 1: data = data.mean(axis=1)
-if sr != 16000: data = signal.resample(data, int(len(data) * 16000 / sr))
-data = np.clip(data * 4.0, -1.0, 1.0)  # 4x gain
-pcm = (data * 32767).astype(np.int16).tobytes()
-
-# Send to G1
-resp = requests.post("http://192.168.123.164:5050/play_audio", data=pcm)
-print(resp.json())
-EOF
+# Expected output:
+#   ● Chatterbox TTS (172.16.6.19:8000) - Running
+#   ● Whisper STT (172.16.4.250:8001) - Running
+#   ● Ollama LLM (172.16.4.226:11434) - Running
+#   ● Voice Assistant (172.16.6.19:8080) - Running
 ```
 
----
+### Access Web Interface
 
-## ROS2 Topics
+Open browser: `https://172.16.6.19:8080/stream`
 
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/arm_ctrl/command` | String | Arm controller commands |
-| `/arm_ctrl/status` | String | Arm controller status (JSON) |
-| `/orchestrator/action_command` | ActionCommand | Orchestrator commands |
-| `/g1/tts/audio_output` | UInt8MultiArray | PCM audio data |
-| `/g1/tts/speaking` | Bool | TTS playback status |
-| `/g1/tts/stop` | Empty | Stop audio playback |
+(Accept the self-signed certificate warning)
 
 ---
 
-## Docker Management
+## Voice Commands
+
+### Gestures (LOW risk - immediate execution)
+| Command | Action |
+|---------|--------|
+| "wave", "wave at me" | Wave gesture |
+| "shake hands" | Handshake gesture |
+| "hug", "give me a hug" | Hug gesture |
+| "high five" | High five gesture |
+| "headshake" | Shake head |
+
+### Motion (MEDIUM risk - needs "yes" confirmation)
+| Command | Action |
+|---------|--------|
+| "walk forward" | Walk forward 2 seconds |
+| "walk backward" | Walk backward 2 seconds |
+| "turn left" | Turn left 1.5 seconds |
+| "turn right" | Turn right 1.5 seconds |
+| "stop" | Emergency stop (immediate) |
+
+### Posture (MEDIUM risk - needs confirmation)
+| Command | Action |
+|---------|--------|
+| "stand up" | Stand from sitting |
+| "sit down" | Sit down |
+| "squat" | Squat position |
+
+### System (HIGH risk - needs confirmation)
+| Command | Action |
+|---------|--------|
+| "initialize" | Full boot sequence |
+| "ready mode" | Enter ready state (FSM 801) |
+| "damp mode" | Enter damp mode (limp) |
+
+---
+
+## Service Management
+
+### g1_services.sh Commands
 
 ```bash
-# View all containers
-sudo docker ps -a
+~/scripts/g1_services.sh status all     # Check all services
+~/scripts/g1_services.sh start all      # Start all services
+~/scripts/g1_services.sh stop all       # Stop all services
+~/scripts/g1_services.sh restart brain  # Restart voice assistant
+~/scripts/g1_services.sh restart whisper # Restart Whisper STT
+```
+
+### G1 Docker Commands
+
+```bash
+# SSH to G1
+ssh unitree@172.16.2.242
+
+# Check running containers
+docker compose ps
 
 # View logs
-sudo docker logs g1_orchestrator
-sudo docker logs arm_controller
-sudo docker logs tts_audio_player
-sudo docker logs audio_receiver
+docker logs http_action_bridge
+docker logs g1_orchestrator
+docker logs audio_receiver
 
-# Stop all
-sudo docker stop g1_orchestrator arm_controller tts_audio_player audio_receiver
+# Restart specific service
+docker compose restart http_action_bridge
 
-# Remove all
-sudo docker rm g1_orchestrator arm_controller tts_audio_player audio_receiver
-
-# Rebuild image
-sudo docker build -t g1_orchestrator:v2.10 .
+# Restart all
+docker compose down && docker compose up -d
 ```
 
 ---
 
 ## Troubleshooting
 
-### Arms don't move
-```bash
-# Check FSM state (must be 801)
-ros2 topic pub --once /orchestrator/action_command orchestrator_msgs/msg/ActionCommand \
-    '{action_name: "getfsm"}'
+### Voice commands not working
 
-# Init robot first if FSM != 801
-ros2 topic pub --once /orchestrator/action_command orchestrator_msgs/msg/ActionCommand \
-    '{action_name: "init"}'
+```bash
+# 1. Check all services
+~/scripts/g1_services.sh status all
+
+# 2. Check brain_v2 logs
+tail -f /tmp/brain_v2.log | grep -v VAD
+
+# 3. Test HTTP action bridge
+curl -X POST http://172.16.2.242:5051/action \
+  -H "Content-Type: application/json" \
+  -d '{"action": "WAVE", "source": "test"}'
 ```
 
-### Audio volume low
-Edit `brain_v2/config.json`:
-```json
-"g1_audio": {
-  "gain": 5.0
-}
+### Audio not playing on G1 speaker
+
+```bash
+# Test audio endpoint
+curl http://172.16.2.242:5050/health
+
+# Check audio_receiver logs
+ssh unitree@172.16.2.242 "docker logs audio_receiver"
 ```
 
-### Chatterbox not responding
+### Robot not responding to actions
+
 ```bash
-curl http://localhost:8000/health
-# If fails, restart:
-cd ~/Music/chatterbox && source .venv/bin/activate && python tts_server.py
+# Check orchestrator logs
+ssh unitree@172.16.2.242 "docker logs g1_orchestrator"
+
+# Verify HTTP bridge is publishing to ROS2
+ssh unitree@172.16.2.242 "docker logs http_action_bridge"
+```
+
+### STT not transcribing
+
+```bash
+# Check Whisper server
+curl http://172.16.4.250:8001/health
+
+# Check Whisper logs
+ssh b@172.16.4.250 "tail -f /tmp/whisper.log"
 ```
 
 ---
 
-## Version Info
+## Network Requirements
 
-- **arm_controller**: v2.8 (teach mode, recording, playback)
-- **g1_orchestrator**: v2.7
-- **audio_player**: v1.0
-- **brain_v2**: v2.1.2
-- **Docker image**: g1_orchestrator:v2.10
+| Port | Service | Protocol |
+|------|---------|----------|
+| 11434 | Ollama LLM | TCP |
+| 8001 | Whisper STT | TCP |
+| 8000 | Chatterbox TTS | TCP |
+| 8080 | brain_v2 (HTTPS) | TCP |
+| 5050 | G1 Audio Receiver | TCP |
+| 5051 | HTTP Action Bridge | TCP |
+
+Ensure firewall allows these ports between the machines.
+
+---
+
+## Version History
+
+- **v2.1.6** - HTTP action bridge for voice commands, docker compose v2, distributed architecture
+- **v2.1.5** - Voice control integration with intent reasoner
+- **v2.1.4** - Action gatekeeper safety validation
+- **v2.1.3** - Initial voice command support
+
+---
+
+## File Locations Summary
+
+| Component | Machine | Path |
+|-----------|---------|------|
+| brain_v2 | Main PC | `~/Downloads/indu_brain_v2_1_6/` |
+| Chatterbox | Main PC | `~/Music/chatterbox/` |
+| Whisper | PC "b" | `~/Whisper/` |
+| G1 Docker | G1 Robot | `~/deployed/v2_1_6/` |
+| Service Script | Main PC | `~/scripts/g1_services.sh` |
+
+---
+
+## Credits
+
+Developed for G1 Humanoid Robot by SS Innovations.

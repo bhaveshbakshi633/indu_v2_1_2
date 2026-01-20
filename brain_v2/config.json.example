@@ -1,9 +1,9 @@
 {
   "g1_audio": {
     "enabled": true,
-    "host": "192.168.123.164",
+    "host": "172.16.2.242",
     "port": 5050,
-    "gain": 4.0
+    "gain": 0.5
   },
   "stt_backend": "whisper_server",
   "tts_backend": "chatterbox",
@@ -29,7 +29,7 @@
       "volume": 0.8
     },
     "vibevoice": {
-      "host": "172.16.6.19",
+      "host": "172.16.4.226",
       "port": 8787,
       "voice": "hi-Aish_woman",
       "seed": 50,
@@ -52,14 +52,14 @@
       "language": "en"
     },
     "whisper_server": {
-      "host": "172.16.4.226",
+      "host": "172.16.4.250",
       "port": 8001,
       "model": "medium",
       "language": "en"
     }
   },
   "llm": {
-    "deployment_mode": "local",
+    "deployment_mode": "remote",
     "model": "llama3.1:8b",
     "use_rag": true,
     "local": {
@@ -67,7 +67,7 @@
       "port": 11434
     },
     "remote": {
-      "host": "172.16.6.19",
+      "host": "172.16.4.226",
       "port": 11434
     },
     "options": {

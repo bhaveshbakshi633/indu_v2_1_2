@@ -1,0 +1,10 @@
+# Enroll a new person or update existing
+
+string name
+string mode
+string folder_path
+int32 num_captures
+---
+bool success
+string message
+int32 embeddings_count

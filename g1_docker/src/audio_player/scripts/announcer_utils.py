@@ -35,7 +35,7 @@ class AnnouncerTTS:
     Automatically checks for Chatterbox availability and switches back when restored
     """
 
-    def __init__(self, chatterbox_host='192.168.123.169', chatterbox_port=8000,
+    def __init__(self, chatterbox_host='172.16.6.19', chatterbox_port=8000,
                  audio_receiver_url='http://localhost:5050/play_audio',
                  edge_voice='en-IN-NeerjaExpressiveNeural', gain=4.0):
         self.chatterbox_host = chatterbox_host
@@ -259,7 +259,7 @@ class AnnouncerTTS:
 # Global announcer instance
 _announcer = None
 
-def get_announcer(chatterbox_host='192.168.123.169', chatterbox_port=8000, gain=None):
+def get_announcer(chatterbox_host='172.16.6.19', chatterbox_port=8000, gain=None):
     """Get or create global announcer instance"""
     global _announcer
     if _announcer is None:

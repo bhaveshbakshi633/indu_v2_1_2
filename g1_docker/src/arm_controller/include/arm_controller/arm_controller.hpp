@@ -1,5 +1,5 @@
 /**
- * Arm Controller - v2.8
+ * Arm Controller - v2.10
  *
  * FIXES v2.7:
  * 1. Worker thread for long operations
@@ -12,6 +12,26 @@
  * 6. Teach mode: commanded_pos_ synced continuously
  * 7. Continuous recording with timestamps
  * 8. Play command with exact timing replay
+ *
+ * FIXES v2.9 (Safety Critical):
+ * 9. ARM_DISABLED/ARM_DISABLING states - FSM exit ramps down properly
+ * 10. commanded_pos_ cleared on disable - prevents arm snap on re-entry
+ * 11. FSM transition handling - immediate response to FSM changes
+ * 12. stop() no longer clears safety_ok_ - separate reset_safety command
+ * 13. Reduced position error tolerance (0.3 -> 0.1 rad)
+ * 14. trajectory_ mutex protection - fixes data race
+ * 15. FSM polling reduced to 50Hz (was 5Hz)
+ *
+ * FIXES v2.10:
+ * 16. MOVING state timeout detection - detect stuck motions
+ * 17. TRANSITIONING state - prevents position error faults during teach entry/exit
+ * 18. Lowstate timeout during motion - abort if comms lost
+ * 19. Command age tracking - reject stale commanded_pos_
+ * 20. Velocity filter - exponential moving average reduces noise
+ * 21. Basic workspace check - elbow collision prevention
+ * 22. Command response topic - feedback to brain server
+ * 23. Watchdog timer - detects control loop hang
+ * 24. Torque monitoring - detect motor fighting obstacles
  */
 
 #ifndef ARM_CONTROLLER__ARM_CONTROLLER_HPP_
@@ -62,9 +82,14 @@ constexpr double SLOW_COAST_KD = 10.0;
 constexpr double BLEND_DURATION = 3.0;
 constexpr double MIN_BLEND_TIME = 0.1;
 
-constexpr double MAX_POSITION_ERROR = 0.3;
+constexpr double MAX_POSITION_ERROR = 0.1;  // v2.9: Reduced from 0.3 rad (17deg) to 0.1 rad (5.7deg)
 constexpr double MAX_JOINT_JUMP = 1.5;
 constexpr double MAX_JOINT_VELOCITY = 3.0;
+
+// v2.9: FSM transition timing constants
+constexpr double DISABLE_RAMP_DURATION = 0.5;  // 500ms to ramp Kp to 0 on FSM exit
+constexpr double ENABLE_RAMP_DURATION = 2.0;   // 2s to ramp Kp back up on re-entry
+constexpr int FSM_POLL_INTERVAL_MS = 20;       // 50Hz FSM polling (was 200ms/5Hz)
 
 constexpr double RAMP_DURATION = 2.0;
 constexpr double START_KP = 10.0;
@@ -75,6 +100,18 @@ constexpr int CONTROL_RATE_HZ = 500;
 // Recording rate - 50Hz is enough for smooth playback, saves memory
 constexpr int RECORDING_RATE_HZ = 50;
 constexpr int RECORDING_DIVIDER = CONTROL_RATE_HZ / RECORDING_RATE_HZ;  // 10
+
+// v2.10: New safety constants
+constexpr double MOTION_TIMEOUT_SEC = 30.0;           // Max time for any motion (detect stuck)
+constexpr double LOWSTATE_MOTION_TIMEOUT_MS = 50.0;   // Max lowstate age during motion
+constexpr double COMMAND_AGE_MAX_MS = 500.0;          // Max age of commanded_pos_ before stale
+constexpr double VELOCITY_FILTER_ALPHA = 0.3;         // EMA filter coefficient for velocity
+constexpr double MAX_SUSTAINED_TORQUE = 15.0;         // Nm, detect motor fighting obstacle
+constexpr double TORQUE_SUSTAINED_TIME_SEC = 0.5;     // How long high torque before fault
+constexpr double WATCHDOG_TIMEOUT_MS = 100.0;         // Control loop watchdog timeout
+
+// v2.10: Workspace limits for collision prevention (approximate)
+constexpr double ELBOW_MIN_HEIGHT = 0.1;              // Min elbow height from shoulder (prevent body collision)
 
 constexpr std::array<double, 7> HOME_LEFT = {0.4, 0.15, 0.0, 0.5, 0.0, 0.0, 0.0};
 constexpr std::array<double, 7> HOME_RIGHT = {0.4, -0.15, 0.0, 0.5, 0.0, 0.0, 0.0};
@@ -113,7 +150,19 @@ inline const std::map<int, std::string> JOINT_NAMES = {
 };
 
 enum class BootState { DISCONNECTED, INIT, WAIT_LOWSTATE, DAMPING, STANDING_UP, READY, HOLDING, MOVING_TO_HOME, AT_HOME, ERROR };
-enum class ArmState { IDLE, HOLDING, MOVING, TEACH };
+
+// v2.9: Added ARM_DISABLED, ARM_DISABLING, ARM_ENABLING for safe FSM transitions
+// v2.10: Added TRANSITIONING for teach entry/exit (skip position error check)
+enum class ArmState {
+    ARM_DISABLED,    // Zero torque, no commands sent, waiting for init_arms
+    ARM_DISABLING,   // Ramping Kp to 0, clearing commanded_pos_
+    ARM_ENABLING,    // Ramping Kp up after init_arms
+    IDLE,            // Initialized but not holding position
+    HOLDING,         // Holding commanded position
+    MOVING,          // Executing trajectory
+    TEACH,           // Gravity compensation, low stiffness
+    TRANSITIONING    // v2.10: Kp ramp in progress (skip position error check)
+};
 
 inline double smoothstep(double t) {
     t = std::max(0.0, std::min(1.0, t));
@@ -144,6 +193,8 @@ public:
     bool executeSequence(const std::string& json_sequence);
     bool stop();
     bool cancel();
+    bool resetSafety();  // v2.9: Explicit safety reset (replaces stop() clearing safety_ok_)
+    bool disableArms();  // v2.9: Manually trigger arm disable
 
     // Teach mode
     bool enterTeach();
@@ -172,6 +223,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_pub_;
     rclcpp::Publisher<unitree_hg::msg::LowCmd>::SharedPtr arm_sdk_pub_;
     rclcpp::Publisher<unitree_api::msg::Request>::SharedPtr api_request_pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr command_response_pub_;  // v2.10: Feedback to brain
 
     // FSM API
     std::map<uint64_t, unitree_api::msg::Response> response_cache_;
@@ -218,15 +270,38 @@ private:
     std::atomic<bool> running_{false};
     mutable std::mutex state_mutex_;
 
-    // Velocity tracking
+    // Velocity tracking - v2.10: EMA filtered velocity
     std::map<int, double> prev_positions_;
     std::chrono::steady_clock::time_point prev_time_;
+    std::map<int, double> filtered_velocity_;  // v2.10: EMA filtered for noise reduction
 
-    // Recording - NEW v2.8
+    // Recording - v2.8
     std::atomic<bool> is_recording_{false};
     std::vector<TrajectoryPoint> trajectory_;
+    std::mutex trajectory_mutex_;  // v2.9: Protect trajectory_ from data race
     std::chrono::steady_clock::time_point recording_start_time_;
     int recording_frame_counter_ = 0;
+
+    // v2.9: FSM transition handling
+    std::atomic<int> last_fsm_{-1};                              // Track FSM changes
+    std::chrono::steady_clock::time_point disable_start_time_;   // When disable ramp started
+    double disable_start_kp_ = 0.0;                              // Kp at start of disable ramp
+
+    // v2.10: Command age tracking - prevent stale commands
+    std::chrono::steady_clock::time_point commanded_pos_timestamp_;
+
+    // v2.10: Motion timeout detection
+    std::chrono::steady_clock::time_point motion_start_timestamp_;
+    std::atomic<bool> motion_active_{false};
+
+    // v2.10: Watchdog timer
+    std::atomic<std::chrono::steady_clock::time_point> last_control_loop_time_;
+    std::thread watchdog_thread_;
+
+    // v2.10: Torque monitoring
+    std::map<int, double> motor_torque_;
+    std::chrono::steady_clock::time_point high_torque_start_time_;
+    std::atomic<bool> high_torque_detected_{false};
 
     // Methods
     void lowstateCallback(const unitree_hg::msg::LowState::SharedPtr msg);
@@ -260,7 +335,23 @@ private:
     void moveToHomeWorker();
     void enterTeachWorker();
     void exitTeachWorker();
-    void playTrajectoryWorker();  // NEW v2.8
+    void playTrajectoryWorker();
+
+    // v2.9: FSM transition handling
+    void handleFsmTransition(int old_fsm, int new_fsm);
+    void beginArmDisable(const std::string& reason);
+    void processArmDisabling();   // Called from controlLoop during ARM_DISABLING state
+    void processArmEnabling();    // Called from controlLoop during ARM_ENABLING state
+
+    // v2.10: New safety checks
+    bool checkMotionTimeout();                          // Detect stuck motions
+    bool checkLowstateForMotion();                      // Stricter lowstate check during motion
+    bool checkCommandAge();                             // Detect stale commanded_pos_
+    bool checkWorkspace(const std::map<int, double>& positions);  // Basic collision check
+    bool checkTorque();                                 // Motor fighting obstacle
+    void updateFilteredVelocity();                      // EMA velocity update
+    void watchdogLoop();                                // Control loop monitor
+    void publishCommandResponse(const std::string& cmd, bool success, const std::string& message);
 };
 
 }  // namespace arm_controller

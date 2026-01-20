@@ -1,0 +1,52 @@
+# Shakal ROS2 Parameters
+# NOTE: Model/database paths are overridden by launch file dynamically
+
+face_recognition:
+  ros__parameters:
+    # Camera settings (direct V4L2 capture)
+    camera:
+      device_id: 0
+      width: 1920
+      height: 1080
+      fps: 30
+      format: "MJPG"
+
+    # Model paths (overridden by launch file)
+    models:
+      detection_path: ""
+      recognition_path: ""
+      detection_input_size: [640, 640]
+      recognition_input_size: [112, 112]
+
+    # Detection thresholds
+    detection:
+      confidence_threshold: 0.6
+      nms_threshold: 0.3
+
+    # Recognition settings
+    recognition:
+      similarity_threshold: 0.6
+      database_path: ""
+
+    # Anti-spoof (disabled by default)
+    antispoof:
+      enabled: false
+      model_path: ""
+      threshold: 0.5
+
+    # Output settings
+    output:
+      publish_debug_image: false
+      publish_rate_hz: 10.0
+      unknown_persist_time: 3.0
+
+enrollment:
+  ros__parameters:
+    # Model paths (overridden by launch file)
+    models:
+      detection_path: ""
+      recognition_path: ""
+    recognition:
+      database_path: ""
+    camera:
+      device_id: 0

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Status Announcer - Continuous ROS2 status monitoring with voice announcements
+Status Announcer - v2.10
+Continuous ROS2 status monitoring with voice announcements
 Monitors arm_controller and orchestrator status, announces important state changes
+
+v2.10: Added FSM state broadcast subscription for immediate announcements
 """
 
 import os
@@ -14,7 +17,7 @@ import threading
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from std_msgs.msg import String
+from std_msgs.msg import String, Int32
 
 # Add scripts directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -52,13 +55,25 @@ class StatusAnnouncer(Node):
             10
         )
 
-        # State mapping for announcements
+        # v2.10: Subscribe to FSM state broadcast from orchestrator for immediate announcements
+        self.fsm_state_sub = self.create_subscription(
+            Int32,
+            '/fsm_state',
+            self.fsm_state_callback,
+            10
+        )
+
+        # State mapping for announcements - v2.10: Added new arm states
         self.arm_state_messages = {
             'AT_HOME': 'Arm controller at home position',
             'MOVING': 'Arms moving',
             'TEACH': 'Teach mode activated',
             'IDLE': None,  # Don't announce idle
             'HOLDING': None,
+            'ARM_DISABLED': 'Arms disabled',
+            'ARM_DISABLING': 'Arms disabling',
+            'ARM_ENABLING': 'Arms initializing',
+            'TRANSITIONING': None,  # Don't announce transition
             'ERROR': 'Arm controller error detected'
         }
 
@@ -75,10 +90,11 @@ class StatusAnnouncer(Node):
             'DAMPING': 'Robot in damping mode'
         }
 
+        # v2.10: FSM state messages - announces state transitions
         self.fsm_state_messages = {
-            801: 'Robot in ready state',
-            1: 'Robot damped',
-            0: None,  # Zero torque - don't announce
+            801: 'Robot ready for arm control',
+            1: 'Robot entering damp mode',
+            0: 'Zero torque mode',
             4: 'Robot standing up'
         }
 
@@ -88,8 +104,8 @@ class StatusAnnouncer(Node):
         # Timer for startup complete announcement
         self.startup_timer = self.create_timer(5.0, self.check_startup_complete)
 
-        self.get_logger().info('Status Announcer initialized')
-        self.get_logger().info('Listening for arm_ctrl/status')
+        self.get_logger().info('Status Announcer v2.10 initialized')
+        self.get_logger().info('Listening for /arm_ctrl/status and /fsm_state')
 
     def _load_config(self):
         """Load configuration"""
@@ -125,18 +141,30 @@ class StatusAnnouncer(Node):
                         self._queue_announcement(message)
                 self.prev_boot_state = boot_state
 
-            # Check for FSM state change
-            if fsm != self.prev_fsm_state:
-                if fsm in self.fsm_state_messages:
-                    message = self.fsm_state_messages.get(fsm)
-                    if message:
-                        self._queue_announcement(message)
-                self.prev_fsm_state = fsm
+            # FSM from status is tracked but announcements come from /fsm_state topic
+            # for more immediate notification
+            self.prev_fsm_state = fsm
 
         except json.JSONDecodeError:
             pass
         except Exception as e:
             self.get_logger().error(f'Status callback error: {e}')
+
+    def fsm_state_callback(self, msg):
+        """v2.10: Process FSM state broadcast from orchestrator - immediate announcements"""
+        try:
+            fsm = msg.data
+
+            # Only announce changes and known states
+            if fsm != self.prev_fsm_state and fsm in self.fsm_state_messages:
+                message = self.fsm_state_messages.get(fsm)
+                if message:
+                    self.get_logger().info(f'FSM state change: {self.prev_fsm_state} -> {fsm}')
+                    self._queue_announcement(message)
+                self.prev_fsm_state = fsm
+
+        except Exception as e:
+            self.get_logger().error(f'FSM callback error: {e}')
 
     def _queue_announcement(self, message):
         """Add message to announcement queue"""

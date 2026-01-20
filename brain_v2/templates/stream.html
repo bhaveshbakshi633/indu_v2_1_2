@@ -108,6 +108,121 @@
             display: inline-block;
         }
 
+        /* Audio Control Buttons */
+        .stop-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stop-btn:hover {
+            background: #DC2626;
+            border-color: #DC2626;
+            color: white;
+        }
+
+        .stop-btn.stopped {
+            background: #DC2626;
+            border-color: #DC2626;
+            color: white;
+        }
+
+        .stop-btn.stopped:hover {
+            background: #22C55E;
+            border-color: #22C55E;
+        }
+
+        .mute-g1-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mute-g1-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .mute-g1-btn.muted {
+            background: #F59E0B;
+            border-color: #F59E0B;
+            color: white;
+        }
+
+        /* Audio Control Panel */
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 8px 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 50px;
+        }
+
+        .control-slider {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-color);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .control-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .control-value {
+            font-size: 11px;
+            color: var(--text-primary);
+            min-width: 30px;
+            text-align: right;
+        }
+
         /* Main Content */
         .main-content {
             flex: 1;
@@ -347,6 +462,39 @@
                 height: 14px;
             }
 
+            /* Mobile audio controls */
+            .header-buttons {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .stop-btn, .mute-g1-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .audio-controls {
+                width: 100%;
+                order: 10;
+                margin-top: 8px;
+                padding: 6px 12px;
+                gap: 10px;
+            }
+
+            .control-slider {
+                width: 60px;
+            }
+
+            .control-label {
+                font-size: 10px;
+                min-width: 35px;
+            }
+
+            .control-value {
+                font-size: 10px;
+                min-width: 25px;
+            }
+
             .orb-container {
                 margin: 40px 0 30px 0;
                 width: 300px;
@@ -421,10 +569,40 @@
             <div class="company">SS Innovations Private Limited</div>
         </div>
         <div class="header-buttons">
+            <!-- Mic Mute (existing) -->
             <button class="mute-btn" id="muteBtn" onclick="toggleMute()">
                 <span class="mute-icon">🎤</span>
                 <span id="muteText">Mute</span>
             </button>
+
+            <!-- Stop Audio Button -->
+            <button class="stop-btn" id="stopBtn" onclick="stopAudio()">
+                <span>⏹</span>
+                <span>Stop</span>
+            </button>
+
+            <!-- Mute G1 Speaker Button -->
+            <button class="mute-g1-btn" id="muteG1Btn" onclick="toggleMuteG1()">
+                <span id="muteG1Icon">🔊</span>
+                <span id="muteG1Text">G1</span>
+            </button>
+
+            <!-- Volume & Gain Controls -->
+            <div class="audio-controls">
+                <div class="control-group">
+                    <span class="control-label">Vol</span>
+                    <input type="range" class="control-slider" id="volumeSlider"
+                           min="0" max="100" value="100" oninput="setVolume(this.value)">
+                    <span class="control-value" id="volumeValue">100</span>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Gain</span>
+                    <input type="range" class="control-slider" id="gainSlider"
+                           min="0" max="6" step="0.5" value="1" oninput="setGain(this.value)">
+                    <span class="control-value" id="gainValue">1.0</span>
+                </div>
+            </div>
+
             <a href="/config" class="settings-btn">Settings</a>
         </div>
     </div>
@@ -755,6 +933,115 @@
             }
         }
 
+        // G1 Audio Control Functions
+        let isG1Muted = false;
+        let isStopped = false;
+
+        function stopAudio() {
+            const btn = document.getElementById('stopBtn');
+            isStopped = !isStopped;
+
+            if (isStopped) {
+                // Stop audio
+                fetch('/api/audio/stop', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        btn.classList.add('stopped');
+                        btn.innerHTML = '<span>▶</span><span>Resume</span>';
+                        console.log('Audio stopped:', data);
+                    })
+                    .catch(err => console.error('Stop audio failed:', err));
+            } else {
+                // Resume audio (just clear stopped state)
+                fetch('/api/audio/resume', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        btn.classList.remove('stopped');
+                        btn.innerHTML = '<span>⏹</span><span>Stop</span>';
+                        console.log('Audio resumed:', data);
+                    })
+                    .catch(err => {
+                        // Agar resume endpoint nahi hai to bhi UI update kar do
+                        btn.classList.remove('stopped');
+                        btn.innerHTML = '<span>⏹</span><span>Stop</span>';
+                    });
+            }
+        }
+
+        function toggleMuteG1() {
+            isG1Muted = !isG1Muted;
+            const btn = document.getElementById('muteG1Btn');
+            const icon = document.getElementById('muteG1Icon');
+
+            fetch('/api/audio/mute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ muted: isG1Muted })
+            })
+            .then(response => response.json())
+            .then(data => {
+                isG1Muted = data.muted;
+                if (isG1Muted) {
+                    btn.classList.add('muted');
+                    icon.textContent = '🔇';
+                } else {
+                    btn.classList.remove('muted');
+                    icon.textContent = '🔊';
+                }
+                console.log('G1 mute state:', isG1Muted);
+            })
+            .catch(err => console.error('Mute toggle failed:', err));
+        }
+
+        function setVolume(value) {
+            document.getElementById('volumeValue').textContent = value;
+            fetch('/api/audio/volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: parseInt(value) })
+            })
+            .then(response => response.json())
+            .then(data => console.log('Volume set:', data.volume))
+            .catch(err => console.error('Set volume failed:', err));
+        }
+
+        function setGain(value) {
+            document.getElementById('gainValue').textContent = parseFloat(value).toFixed(1);
+            fetch('/api/audio/gain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gain: parseFloat(value) })
+            })
+            .then(response => response.json())
+            .then(data => console.log('Gain set:', data.gain))
+            .catch(err => console.error('Set gain failed:', err));
+        }
+
+        // Load current audio control state on page load
+        function loadAudioControlState() {
+            fetch('/api/audio/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Set volume slider
+                    document.getElementById('volumeSlider').value = data.volume;
+                    document.getElementById('volumeValue').textContent = data.volume;
+
+                    // Set gain slider
+                    document.getElementById('gainSlider').value = data.gain;
+                    document.getElementById('gainValue').textContent = data.gain.toFixed(1);
+
+                    // Set mute state
+                    isG1Muted = data.muted;
+                    const btn = document.getElementById('muteG1Btn');
+                    const icon = document.getElementById('muteG1Icon');
+                    if (isG1Muted) {
+                        btn.classList.add('muted');
+                        icon.textContent = '🔇';
+                    }
+                })
+                .catch(err => console.log('Could not load audio state:', err));
+        }
+
         // Store full AI response for expand/collapse
         let fullAiResponse = '';
         let isExpanded = true; // Default: show full text
@@ -983,6 +1270,7 @@
         window.addEventListener('load', () => {
             initThreeJS();
             connectWebSocket();
+            loadAudioControlState();  // Load volume/gain/mute state
         });
 
         // Prevent zoom on double-tap (mobile)

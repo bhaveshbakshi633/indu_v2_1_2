@@ -97,7 +97,7 @@ try:
     from chatterbox_tts_client import ChatterboxTTS
     CHATTERBOX_AVAILABLE = True
 except ImportError:
-    print("⚠️ ChatterboxTTS not available")
+    print("[WARN] ChatterboxTTS not available")
     CHATTERBOX_AVAILABLE = False
 
 # Import VAD Pipeline components
@@ -108,7 +108,7 @@ try:
     from indu_rag import InduAgent
     RAG_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ RAG not available: {e}")
+    print(f"[WARN] RAG not available: {e}")
     RAG_AVAILABLE = False
 
 # ROS2 imports for playback status publishing
@@ -117,8 +117,19 @@ try:
     from std_msgs.msg import Bool
     ROS2_AVAILABLE = True
 except ImportError:
-    print("⚠️ ROS2 not available - playback status will not be published to ROS2 topic")
+    print("[WARN] ROS2 not available - playback status will not be published to ROS2 topic")
     ROS2_AVAILABLE = False
+
+# Voice control imports - action detection aur G1 communication
+try:
+    from stop_fast_path import detect_stop, StopFastPath
+    from intent_reasoner import IntentReasoner, IntentType
+    from voice_bridge import get_voice_bridge, VoiceActionRequest
+    VOICE_CONTROL_AVAILABLE = True
+    print("[OK] Voice control modules loaded")
+except ImportError as e:
+    print(f"[WARN] Voice control not available: {e}")
+    VOICE_CONTROL_AVAILABLE = False
 
 
 # ============================================================
@@ -153,7 +164,7 @@ class PlaybackStatusPublisher:
         self._state_lock = threading.Lock()
 
         if not ROS2_AVAILABLE:
-            print("⚠️ ROS2 not available - PlaybackStatusPublisher disabled")
+            print("[WARN] ROS2 not available - PlaybackStatusPublisher disabled")
             return
 
         try:
@@ -173,10 +184,10 @@ class PlaybackStatusPublisher:
             self.publish_thread = threading.Thread(target=self._publish_loop, daemon=True)
             self.publish_thread.start()
 
-            print("✅ ROS2 PlaybackStatusPublisher initialized - publishing to /brain/playback_status @ 10Hz")
+            print("[OK] ROS2 PlaybackStatusPublisher initialized - publishing to /brain/playback_status @ 10Hz")
 
         except Exception as e:
-            print(f"❌ Failed to initialize ROS2 publisher: {e}")
+            print(f"[ERR] Failed to initialize ROS2 publisher: {e}")
             self.node = None
             self.publisher = None
 
@@ -199,7 +210,7 @@ class PlaybackStatusPublisher:
                 break
             except Exception as e:
                 if self._running:  # Only log if not shutting down
-                    print(f"⚠️ ROS2 publish error: {e}")
+                    print(f"[WARN] ROS2 publish error: {e}")
                 break
 
     def set_playing(self, is_playing: bool):
@@ -207,7 +218,7 @@ class PlaybackStatusPublisher:
         with self._state_lock:
             if self._is_playing != is_playing:
                 self._is_playing = is_playing
-                print(f"📡 ROS2: /brain/playback_status → {is_playing}")
+                print(f"[NET] ROS2: /brain/playback_status → {is_playing}")
 
     def shutdown(self):
         """Cleanup ROS2 resources"""
@@ -318,13 +329,13 @@ def transcribe_with_whisper_server(audio_data, config):
         return text if text else None
 
     except requests.exceptions.ConnectionError:
-        print(f"❌ Cannot connect to Whisper server at {url}")
+        print(f"[ERR] Cannot connect to Whisper server at {url}")
         return None
     except requests.exceptions.Timeout:
-        print(f"❌ Whisper server timeout")
+        print(f"[ERR] Whisper server timeout")
         return None
     except Exception as e:
-        print(f"❌ Whisper server error: {e}")
+        print(f"[ERR] Whisper server error: {e}")
         return None
 
 
@@ -335,7 +346,7 @@ def transcribe_with_whisper_server(audio_data, config):
 def run_calibration():
     """Run audio calibration for interrupt detection"""
     try:
-        print("\n🎙️ Starting calibration from web UI...")
+        print("\n[CAL] Starting calibration from web UI...")
         print("   Playing test tone (listen for beep)...")
 
         # Generate a test tone (1kHz sine wave, 1 second)
@@ -375,20 +386,20 @@ def run_calibration():
             if speaker_energy > 0:
                 echo_scale = mic_energy / speaker_energy
                 echo_scale = np.clip(echo_scale, 0.5, 1.5)  # Reasonable range
-                print(f"   ✅ Calibration complete (echo scale: {echo_scale:.2f})")
+                print(f"   [OK] Calibration complete (echo scale: {echo_scale:.2f})")
 
                 # Save to file
                 try:
                     with open(CALIBRATION_FILE, 'w') as f:
                         json.dump({"echo_scale": float(echo_scale)}, f)
-                    print(f"   💾 Saved to {CALIBRATION_FILE}")
+                    print(f"   [SAVE] Saved to {CALIBRATION_FILE}")
                     return {
                         'success': True,
                         'echo_scale': float(echo_scale),
                         'message': f'Calibration successful! Echo scale: {echo_scale:.2f}. Restart the assistant to apply.'
                     }
                 except Exception as e:
-                    print(f"   ⚠️ Could not save calibration: {e}")
+                    print(f"   [WARN] Could not save calibration: {e}")
                     return {
                         'success': False,
                         'error': f'Could not save calibration: {e}'
@@ -400,7 +411,7 @@ def run_calibration():
         }
 
     except Exception as e:
-        print(f"   ❌ Calibration failed: {e}")
+        print(f"   [ERR] Calibration failed: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -610,7 +621,7 @@ class VADInterruptMonitor:
                         chunk_count += 1
 
                         if interrupt_confirmed:
-                            print(f"\n🚨 [VAD INTERRUPT] CONFIRMED! (VAD: {prob:.3f}, total chunks processed: {chunk_count})")
+                            print(f"\n[INTR] [VAD INTERRUPT] CONFIRMED! (VAD: {prob:.3f}, total chunks processed: {chunk_count})")
                             with self.lock:
                                 self.interrupted = True
                             return  # Exit monitoring once interrupted
@@ -665,7 +676,7 @@ class AudioStreamManager:
                 host = g1_config.get("host", "192.168.123.164")
                 port = g1_config.get("port", 5050)
                 self.g1_url = f"http://{host}:{port}/play_audio"
-                self.g1_gain = g1_config.get("gain", 3.0)  # Default 3x amplification
+                self.g1_gain = g1_config.get("gain", 1.0)  # Default 1x amplification
                 self.g1_enabled = True
                 print(f"  G1 Audio enabled: {self.g1_url} (gain: {self.g1_gain}x)")
         except Exception as e:
@@ -826,7 +837,7 @@ class AudioPlayer:
         if ros2_pub:
             ros2_pub.set_playing(is_playing)
         else:
-            print(f"📢 Playback status: {'STARTED' if is_playing else 'ENDING'} (ROS2 not available)")
+            print(f"[PLAY] Playback status: {'STARTED' if is_playing else 'ENDING'} (ROS2 not available)")
 
     def _is_last_chunk(self):
         """Check if current chunk is the last one (queue empty and TTS done)"""
@@ -903,7 +914,7 @@ class AudioPlayer:
                 self.interrupt_monitor.set_playback_audio(data_16k.astype(np.float32))
 
             # Use stream manager for safe playback
-            print(f"  🔊 Playing chunk {chunk_num}...")
+            print(f"  [TTS] Playing chunk {chunk_num}...")
             if not self.stream_manager.safe_play(data, sr_rate):
                 return False
 
@@ -927,7 +938,7 @@ class AudioPlayer:
 
                     # Check for interrupt
                     if self.interrupt_monitor and self.interrupt_monitor.is_interrupted():
-                        print(f"  🛑 Interrupt detected during chunk {chunk_num}")
+                        print(f"  [STOP] Interrupt detected during chunk {chunk_num}")
                         self.stream_manager.safe_stop()
                         interrupted = True
                         # Immediately publish False on interrupt
@@ -956,18 +967,18 @@ class AudioPlayer:
                     self._publish_playback_status(False)
 
             except Exception as e:
-                print(f"  ⚠️ Error during playback: {e}")
+                print(f"  [WARN] Error during playback: {e}")
                 self.stream_manager.safe_stop()
 
             self.chunks_played += 1
 
             if not interrupted:
-                print(f"  ✓ Chunk {chunk_num} done")
+                print(f"  + Chunk {chunk_num} done")
 
             return interrupted
 
         except Exception as e:
-            print(f"  ✗ Playback error: {e}")
+            print(f"  - Playback error: {e}")
             return False
         finally:
             try:
@@ -1070,18 +1081,18 @@ class TTSGenerator:
                 temp_path = temp_file.name
                 temp_file.close()
 
-                print(f"  🎤 TTS chunk {chunk_num} ({len(text)} chars)...")
+                print(f"  [MIC] TTS chunk {chunk_num} ({len(text)} chars)...")
                 start = time.time()
 
                 try:
                     asyncio.run(self._generate_tts(text, temp_path))
                     gen_time = time.time() - start
-                    print(f"  ✓ TTS chunk {chunk_num} ready ({gen_time:.2f}s)")
+                    print(f"  + TTS chunk {chunk_num} ready ({gen_time:.2f}s)")
 
                     # Queue for playback
                     self.audio_player.add(temp_path, chunk_num)
                 except Exception as e:
-                    print(f"  ✗ TTS error chunk {chunk_num}: {e}")
+                    print(f"  - TTS error chunk {chunk_num}: {e}")
                     try:
                         os.unlink(temp_path)
                     except:
@@ -1118,7 +1129,7 @@ class TTSGenerator:
                 if temp_path and temp_path != output_path:
                     os.rename(temp_path, output_path)
             except Exception as e:
-                print(f"  ⚠️ Chatterbox failed ({e}), falling back to Edge TTS...")
+                print(f"  [WARN] Chatterbox failed ({e}), falling back to Edge TTS...")
                 # Fallback to Edge TTS
                 # Output path might be .wav, need .mp3 for edge
                 edge_output = output_path.replace('.wav', '.mp3')
@@ -1246,14 +1257,14 @@ def _generate_pyttsx3_sync(text, rate, volume):
 
         return temp_path
     except Exception as e:
-        print(f"❌ pyttsx3 sync error: {e}")
+        print(f"[ERR] pyttsx3 sync error: {e}")
         return None
 
 
 async def generate_tts_chunk_pyttsx3(text, rate=150, volume=1.0):
     """Generate TTS audio using pyttsx3 (offline)"""
     if not PYTTSX3_AVAILABLE:
-        print("❌ pyttsx3 not installed. Install with: pip install pyttsx3")
+        print("[ERR] pyttsx3 not installed. Install with: pip install pyttsx3")
         return None
 
     try:
@@ -1261,7 +1272,7 @@ async def generate_tts_chunk_pyttsx3(text, rate=150, volume=1.0):
         temp_path = await loop.run_in_executor(None, _generate_pyttsx3_sync, text, rate, volume)
         return temp_path
     except Exception as e:
-        print(f"❌ pyttsx3 error: {e}")
+        print(f"[ERR] pyttsx3 error: {e}")
         return None
 
 
@@ -1277,7 +1288,7 @@ async def generate_tts_chunk_edge(text, voice):
 
         return temp_path
     except Exception as e:
-        print(f"❌ Edge TTS error: {e}")
+        print(f"[ERR] Edge TTS error: {e}")
         return None
 
 
@@ -1312,11 +1323,11 @@ async def generate_tts_chunk_vibevoice(text, host, port, voice, seed=42, cfg_sca
             gen_time = response.headers.get('X-Generation-Time', 'N/A')
             audio_dur = response.headers.get('X-Audio-Duration', 'N/A')
             rtf = response.headers.get('X-RTF', 'N/A')
-            print(f"  ℹ️  VibeVoice: gen={gen_time}s, dur={audio_dur}s, RTF={rtf}")
+            print(f"  [INFO] VibeVoice: gen={gen_time}s, dur={audio_dur}s, RTF={rtf}")
 
             return temp_path
         else:
-            print(f"❌ VibeVoice server error: {response.status_code} - {response.text}")
+            print(f"[ERR] VibeVoice server error: {response.status_code} - {response.text}")
             try:
                 os.unlink(temp_path)
             except:
@@ -1324,7 +1335,7 @@ async def generate_tts_chunk_vibevoice(text, host, port, voice, seed=42, cfg_sca
             return None
 
     except requests.exceptions.ConnectionError:
-        print(f"❌ VibeVoice connection error: Cannot connect to {host}:{port}")
+        print(f"[ERR] VibeVoice connection error: Cannot connect to {host}:{port}")
         print(f"   Make sure VibeVoice server is running: docker-compose up -d")
         try:
             os.unlink(temp_path)
@@ -1332,7 +1343,7 @@ async def generate_tts_chunk_vibevoice(text, host, port, voice, seed=42, cfg_sca
             pass
         return None
     except Exception as e:
-        print(f"❌ VibeVoice error: {e}")
+        print(f"[ERR] VibeVoice error: {e}")
         try:
             os.unlink(temp_path)
         except:
@@ -1363,7 +1374,7 @@ async def generate_tts_chunk_chatterbox(text, host, port):
                 f.write(response.content)
             return temp_path
         else:
-            print(f"❌ Chatterbox server error: {response.status_code} - {response.text}")
+            print(f"[ERR] Chatterbox server error: {response.status_code} - {response.text}")
             try:
                 os.unlink(temp_path)
             except:
@@ -1371,14 +1382,14 @@ async def generate_tts_chunk_chatterbox(text, host, port):
             return None
 
     except requests.exceptions.ConnectionError:
-        print(f"❌ Chatterbox connection error: Cannot connect to {host}:{port}")
+        print(f"[ERR] Chatterbox connection error: Cannot connect to {host}:{port}")
         try:
             os.unlink(temp_path)
         except:
             pass
         return None
     except Exception as e:
-        print(f"❌ Chatterbox error: {e}")
+        print(f"[ERR] Chatterbox error: {e}")
         try:
             os.unlink(temp_path)
         except:
@@ -1394,17 +1405,109 @@ async def generate_tts_chunk(text, backend, voice=None, rate=150, volume=1.0, ho
         return await generate_tts_chunk_edge(text, voice)
     elif backend == 'vibevoice':
         if host is None or port is None:
-            print(f"❌ VibeVoice backend requires host and port")
+            print(f"[ERR] VibeVoice backend requires host and port")
             return None
         return await generate_tts_chunk_vibevoice(text, host, port, voice, seed, cfg_scale)
     elif backend == 'chatterbox':
         if host is None or port is None:
-            print(f"❌ Chatterbox backend requires host and port")
+            print(f"[ERR] Chatterbox backend requires host and port")
             return None
         return await generate_tts_chunk_chatterbox(text, host, port)
     else:
-        print(f"❌ Unknown TTS backend: {backend}")
+        print(f"[ERR] Unknown TTS backend: {backend}")
         return None
+
+
+def speak_simple(text, host="127.0.0.1", port=8000):
+    """Simple synchronous TTS for short messages (no async, no streaming)"""
+    try:
+        # Generate TTS via chatterbox
+        url = f"http://{host}:{port}/tts"
+        response = requests.get(url, params={"text": text}, timeout=30)
+
+        if response.status_code != 200:
+            print(f"[TTS] Chatterbox error: {response.status_code}")
+            return False
+
+        # Save to temp file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+        temp_file.write(response.content)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        # Play audio
+        data, sr_rate = sf.read(temp_path)
+        sd.play(data, samplerate=sr_rate)
+        sd.wait()  # Wait for playback to complete
+
+        # Cleanup
+        try:
+            os.unlink(temp_path)
+        except:
+            pass
+
+        return True
+    except Exception as e:
+        print(f"[TTS] speak_simple error: {e}")
+        return False
+
+
+def speak_to_g1(text, tts_host="127.0.0.1", tts_port=8000,
+                g1_host="172.16.2.242", g1_port=5050, gain=1.0):
+    """Generate TTS via Chatterbox and play on G1 robot speaker"""
+    try:
+        # 1. Generate TTS via Chatterbox
+        url = f"http://{tts_host}:{tts_port}/tts"
+        response = requests.get(url, params={"text": text}, timeout=30)
+        if response.status_code != 200:
+            print(f"[TTS] Chatterbox error: {response.status_code}")
+            return False
+
+        # 2. Load audio and convert to PCM
+        import io
+        import scipy.signal
+        data, sr = sf.read(io.BytesIO(response.content))
+
+        # Mono conversion agar stereo hai
+        if len(data.shape) > 1:
+            data = np.mean(data, axis=1)
+
+        # Resample to 16kHz for G1
+        if sr != 16000:
+            num_samples = int(len(data) * 16000 / sr)
+            data = scipy.signal.resample(data, num_samples)
+
+        # Apply gain and convert to 16-bit PCM
+        data = data * gain
+        data = np.clip(data, -1.0, 1.0)
+        pcm_data = (data * 32767).astype(np.int16)
+        pcm_bytes = pcm_data.tobytes()
+
+        # 3. Send to G1 speaker via HTTP POST
+        g1_url = f"http://{g1_host}:{g1_port}/play_audio"
+        g1_response = requests.post(
+            g1_url,
+            data=pcm_bytes,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=10
+        )
+
+        if g1_response.status_code == 200:
+            # Wait for playback to complete (estimate duration)
+            duration = len(pcm_data) / 16000.0
+            time.sleep(duration + 0.3)
+            print(f"[G1] Spoke: '{text[:50]}...' ({duration:.1f}s)")
+            return True
+        else:
+            print(f"[G1] Speaker error: {g1_response.status_code}")
+            return False
+
+    except requests.exceptions.ConnectionError:
+        print(f"[G1] Cannot connect to speaker at {g1_host}:{g1_port}")
+        return False
+    except Exception as e:
+        print(f"[TTS] speak_to_g1 error: {e}")
+        return False
 
 
 def play_audio(audio_path, check_interrupt_callback=None, interrupt_monitor=None):
@@ -1440,7 +1543,7 @@ def play_audio(audio_path, check_interrupt_callback=None, interrupt_monitor=None
             while sd.get_stream().active:
                 # Check if user started speaking (interrupt)
                 if check_interrupt_callback and check_interrupt_callback():
-                    print(f"    🛑 Interrupt callback returned True - STOPPING playback")
+                    print(f"    [STOP] Interrupt callback returned True - STOPPING playback")
                     sd.stop()
                     interrupted = True
                     break
@@ -1450,7 +1553,7 @@ def play_audio(audio_path, check_interrupt_callback=None, interrupt_monitor=None
                     print(f"    ⏸  Playback active (checking interrupts every 50ms, poll #{poll_count})")
                 time.sleep(0.05)  # Poll every 50ms
         except Exception as e:
-            print(f"    ⚠️  Exception during playback: {e}")
+            print(f"    [WARN]  Exception during playback: {e}")
             pass
 
         # Stop audio playback
@@ -1459,7 +1562,7 @@ def play_audio(audio_path, check_interrupt_callback=None, interrupt_monitor=None
 
         return interrupted
     except Exception as e:
-        print(f"❌ Playback error: {e}")
+        print(f"[ERR] Playback error: {e}")
         return False
     finally:
         # Cleanup - ensure audio is fully stopped
@@ -1530,16 +1633,16 @@ class WebStreamingAssistant:
         if deployment_mode == 'local':
             self.llm_host = self.config['llm']['local']['host']
             self.llm_port = self.config['llm']['local']['port']
-            self.deployment_mode = '🏠 LOCAL'
+            self.deployment_mode = 'LOCAL LOCAL'
         elif deployment_mode == 'remote':
             self.llm_host = self.config['llm']['remote']['host']
             self.llm_port = self.config['llm']['remote']['port']
-            self.deployment_mode = '🌐 REMOTE'
+            self.deployment_mode = 'REMOTE REMOTE'
         else:
             # Fallback to old format (host/port at root level)
             self.llm_host = self.config['llm'].get('host', '127.0.0.1')
             self.llm_port = self.config['llm'].get('port', 11434)
-            self.deployment_mode = '⚠️  LEGACY'
+            self.deployment_mode = '[WARN]  LEGACY'
 
         self.ollama_url = f"http://{self.llm_host}:{self.llm_port}/api/chat"
 
@@ -1608,7 +1711,7 @@ class WebStreamingAssistant:
         self.rag_agent = None
         if self.use_rag and RAG_AVAILABLE:
             try:
-                print("🧠 Initializing RAG Agent...")
+                print("[LLM] Initializing RAG Agent...")
                 self.rag_agent = InduAgent(
                     knowledge_base_path=str(Path(__file__).parent / "indu_knowledge_base.txt"),
                     system_prompt_path=str(Path(__file__).parent / "indu_system_prompt.txt"),
@@ -1619,12 +1722,39 @@ class WebStreamingAssistant:
                     temperature=self.llm_temperature,
                     debug_mode=False
                 )
-                print("✅ RAG Agent initialized")
+                print("[OK] RAG Agent initialized")
             except Exception as e:
-                print(f"⚠️ RAG initialization failed: {e}")
+                print(f"[WARN] RAG initialization failed: {e}")
                 self.rag_agent = None
 
-        print(f"🤖 WebStreamingAssistant initialized:")
+        # Initialize Voice Control (Action detection + G1 communication)
+        self.intent_reasoner = None
+        self.voice_bridge = None
+        self.gatekeeper_response = None  # Last gatekeeper response (thread-safe)
+        self.gatekeeper_response_event = None  # Event for response notification
+        if VOICE_CONTROL_AVAILABLE:
+            try:
+                import threading
+                print("[VOICE] Initializing Voice Control...")
+                self.intent_reasoner = IntentReasoner(
+                    ollama_host=self.llm_host,
+                    ollama_port=self.llm_port,
+                    use_llm=True  # LLM-based intent detection (flexible)
+                )
+                self.voice_bridge = get_voice_bridge()
+                self.voice_bridge.start()
+
+                # Gatekeeper response handling - async callback ke liye
+                self.gatekeeper_response_event = threading.Event()
+                self.voice_bridge.set_response_callback(self._on_gatekeeper_response)
+
+                print("[OK] Voice Control initialized (Intent Reasoner + Voice Bridge)")
+            except Exception as e:
+                print(f"[WARN] Voice Control initialization failed: {e}")
+                self.intent_reasoner = None
+                self.voice_bridge = None
+
+        print(f"[ROBOT] WebStreamingAssistant initialized:")
         print(f"   LLM: {self.llm_model} @ {self.llm_host}:{self.llm_port} ({self.deployment_mode})")
         print(f"   RAG: {'Enabled' if self.rag_agent else 'Disabled'}")
 
@@ -1646,35 +1776,73 @@ class WebStreamingAssistant:
         print(f"   TTS chunks: {self.chunk_size_first} (first), {self.chunk_size_rest} (rest)")
         print(f"   Interrupt monitor: VADInterruptMonitor initialized")
 
+        # Start TTS health monitor if using chatterbox
+        if self.tts_backend == "chatterbox":
+            self._start_tts_health_monitor()
+
+
+
+    def _check_chatterbox_health(self):
+        """Chatterbox TTS server health check - quick ping"""
+        if not self.tts_host or not self.tts_port:
+            return False
+        try:
+            response = requests.get(
+                f"http://{self.tts_host}:{self.tts_port}/health",
+                timeout=3
+            )
+            return response.status_code == 200
+        except:
+            return False
+
+    def _start_tts_health_monitor(self):
+        """Background thread jo Chatterbox health monitor karta hai"""
+        def monitor():
+            while True:
+                time.sleep(30)  # Check har 30 seconds
+                is_healthy = self._check_chatterbox_health()
+                
+                if is_healthy:
+                    if self.tts_backend != "chatterbox":
+                        print("Chatterbox wapas available, switching back...")
+                        self.tts_backend = "chatterbox"
+                else:
+                    if self.tts_backend == "chatterbox":
+                        print("Chatterbox unavailable, Edge TTS fallback use hoga")
+        
+        monitor_thread = threading.Thread(target=monitor, daemon=True)
+        monitor_thread.start()
+        print("   TTS health monitor: Started (30s interval)")
+
     def cleanup(self):
         """Clean up on client disconnect - stop all active playback and reset state"""
-        print("🧹 Cleaning up on disconnect...")
+        print("[CLEANUP] Cleaning up on disconnect...")
 
         # Stop active audio player
         if self.active_audio_player:
             try:
                 self.active_audio_player.stop()
-                print("   ✓ Audio player stopped")
+                print("   + Audio player stopped")
             except Exception as e:
-                print(f"   ⚠️ Error stopping audio player: {e}")
+                print(f"   [WARN] Error stopping audio player: {e}")
             self.active_audio_player = None
 
         # Stop active TTS generator
         if self.active_tts_generator:
             try:
                 self.active_tts_generator.stop()
-                print("   ✓ TTS generator stopped")
+                print("   + TTS generator stopped")
             except Exception as e:
-                print(f"   ⚠️ Error stopping TTS generator: {e}")
+                print(f"   [WARN] Error stopping TTS generator: {e}")
             self.active_tts_generator = None
 
         # Stop interrupt monitor
         if self.interrupt_monitor:
             try:
                 self.interrupt_monitor.stop()
-                print("   ✓ Interrupt monitor stopped")
+                print("   + Interrupt monitor stopped")
             except Exception as e:
-                print(f"   ⚠️ Error stopping interrupt monitor: {e}")
+                print(f"   [WARN] Error stopping interrupt monitor: {e}")
 
         # Reset state
         self.state = "idle"
@@ -1687,9 +1855,9 @@ class WebStreamingAssistant:
         ros2_pub = get_ros2_publisher()
         if ros2_pub:
             ros2_pub.set_playing(False)
-            print("   ✓ ROS2 playback status set to False")
+            print("   + ROS2 playback status set to False")
 
-        print("🧹 Cleanup complete")
+        print("[CLEANUP] Cleanup complete")
 
     def process_audio_chunk(self, audio_data, ws):
         """Process audio chunk with VAD-based speech detection"""
@@ -1700,7 +1868,7 @@ class WebStreamingAssistant:
             if self.state == "idle":
                 self.state = "listening"
                 self._send_state(ws, "listening")
-                print("🎧 State → LISTENING (VAD-based speech detection active)")
+                print("[LISTEN] State → LISTENING (VAD-based speech detection active)")
 
             # INTERRUPT DETECTION: If AI is speaking/transcribing, add audio to monitor queue
             if self.state in ["speaking", "transcribing"]:
@@ -1709,7 +1877,7 @@ class WebStreamingAssistant:
 
                 # Log audio chunks received during speaking (every 20 frames)
                 if self.frame_count % 20 == 0:
-                    print(f"    📡 Audio chunk queued for VAD interrupt monitoring during {self.state}")
+                    print(f"    [NET] Audio chunk queued for VAD interrupt monitoring during {self.state}")
 
                 # Don't process audio further during speaking/transcribing
                 return
@@ -1751,7 +1919,7 @@ class WebStreamingAssistant:
                         self.speech_started = True
                         self.audio_buffer = []  # Clear any old buffer
                         avg_prob = sum(chunk_vad_probs) / len(chunk_vad_probs)
-                        print(f"🎤 Speech STARTED! (VAD avg: {avg_prob:.3f}, max: {max(chunk_vad_probs):.3f}) - Recording...")
+                        print(f"[MIC] Speech STARTED! (VAD avg: {avg_prob:.3f}, max: {max(chunk_vad_probs):.3f}) - Recording...")
 
                     # Add original chunk to buffer (we buffer the WebSocket chunks, not 512-sample chunks)
                     if i == 0:  # Only add once per WebSocket chunk
@@ -1770,14 +1938,14 @@ class WebStreamingAssistant:
                         # Log silence progress every 0.5s
                         if int(self.silence_duration * 10) % 5 == 0 and i == 0:
                             avg_prob = sum(chunk_vad_probs) / len(chunk_vad_probs)
-                            print(f"🔇 Silence: {self.silence_duration:.1f}s (need {self.silence_threshold}s, "
+                            print(f"[SIL] Silence: {self.silence_duration:.1f}s (need {self.silence_threshold}s, "
                                   f"VAD avg: {avg_prob:.3f}, min: {min(chunk_vad_probs):.3f})")
 
                         # Check if silence threshold reached (1.5s of silence)
                         if self.silence_duration >= self.silence_threshold and not self.is_processing:
                             avg_prob = sum(chunk_vad_probs) / len(chunk_vad_probs)
-                            print(f"✅ Speech ENDED! (silence={self.silence_duration:.1f}s, final VAD: {avg_prob:.3f}) - Sending to STT...")
-                            print(f"   📊 Buffer size: {len(self.audio_buffer)} chunks = {len(self.audio_buffer) * 1365 / 16000:.2f}s of audio")
+                            print(f"[OK] Speech ENDED! (silence={self.silence_duration:.1f}s, final VAD: {avg_prob:.3f}) - Sending to STT...")
+                            print(f"   [BUF] Buffer size: {len(self.audio_buffer)} chunks = {len(self.audio_buffer) * 1365 / 16000:.2f}s of audio")
 
                             # Copy buffer before resetting (avoid race condition)
                             audio_buffer_copy = self.audio_buffer.copy()
@@ -1797,7 +1965,7 @@ class WebStreamingAssistant:
                             return  # Exit early after starting processing
 
         except Exception as e:
-            print(f"❌ Error processing audio chunk: {e}")
+            print(f"[ERR] Error processing audio chunk: {e}")
             self._send_error(ws, str(e))
 
     def _process_buffered_audio_thread(self, ws, audio_buffer):
@@ -1811,7 +1979,7 @@ class WebStreamingAssistant:
             # Update state to transcribing
             self.state = "transcribing"
             self._send_state(ws, "transcribing")
-            print("📝 State → TRANSCRIBING")
+            print("[STT] State → TRANSCRIBING")
 
             # Convert buffer to AudioData for transcription
             audio_bytes = b''.join(audio_buffer)
@@ -1822,7 +1990,7 @@ class WebStreamingAssistant:
 
             # Get STT backend from config
             stt_backend = self.config.get('stt', {}).get('backend', 'google')
-            print(f"🎯 Sending {audio_size} bytes to {stt_backend.upper()} STT...")
+            print(f"[VOICE] Sending {audio_size} bytes to {stt_backend.upper()} STT...")
 
             # Transcribe using configured backend
             try:
@@ -1833,7 +2001,90 @@ class WebStreamingAssistant:
                 else:
                     # Default to Google
                     transcript = self.recognizer.recognize_google(audio_data)
-                print(f"✅ Transcription: '{transcript}'")
+                print(f"[OK] Transcription: '{transcript}'")
+
+                # ============================================================
+                # VOICE CONTROL: Action Detection Before LLM
+                # ============================================================
+                if VOICE_CONTROL_AVAILABLE and self.intent_reasoner and self.voice_bridge:
+                    # STEP 1: Check for STOP fast-path (emergency stop)
+                    stop_result = detect_stop(transcript)
+                    if stop_result.is_stop:
+                        print(f"[STOP] STOP FAST-PATH: '{stop_result.matched_keyword}'")
+                        self.voice_bridge.send_emergency_stop()
+                        self._send_transcript(ws, f"You: {transcript}\n\n[STOP] EMERGENCY STOP", replace=True)
+                        self.state = "listening"
+                        self._send_state(ws, "listening")
+                        # Skip LLM, go back to listening
+                        self.audio_buffer = []
+                        self.speech_started = False
+                        self.silence_duration = 0.0
+                        return
+
+                    # STEP 2: Parse intent (action vs conversation)
+                    intent = self.intent_reasoner.process(transcript)
+                    print(f"[VOICE] Intent: {intent.intent_type.value}, action={intent.action_name}, conf={intent.confidence:.2f}")
+
+                    # STEP 3: Handle Action
+                    if intent.intent_type == IntentType.ACTION and intent.confidence >= 0.8:
+                        if intent.requires_confirmation:
+                            # Ask for confirmation - speak prompt
+                            prompt = self.intent_reasoner.get_confirmation_prompt()
+                            print(f"[CONFIRM] Confirmation needed: {prompt}")
+                            self._send_transcript(ws, f"You: {transcript}\n\nINDU: {prompt}", replace=True)
+
+                            # Speak confirmation prompt on G1 speaker
+                            self.state = "speaking"
+                            self._send_state(ws, "speaking")
+                            speak_to_g1(prompt, self.tts_host, self.tts_port)
+
+                            self.state = "listening"
+                            self._send_state(ws, "listening")
+                            # Stay in confirmation mode - next input will be yes/no
+                            self.audio_buffer = []
+                            self.speech_started = False
+                            self.silence_duration = 0.0
+                            return
+                        else:
+                            # Execute action directly (confirmed or LOW risk)
+                            print(f"[ROBOT] Executing action: {intent.action_name}")
+
+                            # Send action to G1 via HTTP (not ROS2 - network architecture constraint)
+                            try:
+                                action_response = requests.post(
+                                    "http://172.16.2.242:5051/action",
+                                    json={"action": intent.action_name, "source": "voice_assistant"},
+                                    timeout=5
+                                )
+                                if action_response.status_code == 200:
+                                    print(f"[G1] Action sent: {intent.action_name}")
+                                else:
+                                    print(f"[G1] Action rejected: {action_response.text}")
+                            except requests.exceptions.ConnectionError:
+                                print(f"[G1] HTTP bridge not available at 172.16.2.242:5051")
+                            except Exception as e:
+                                print(f"[G1] Action send failed: {e}")
+
+                            # Acknowledge action on G1 speaker
+                            ack = f"Okay, {intent.action_name.lower().replace('_', ' ')}."
+                            self._send_transcript(ws, f"You: {transcript}\n\n[ROBOT] {ack}", replace=True)
+                            self.state = "speaking"
+                            self._send_state(ws, "speaking")
+                            speak_to_g1(ack, self.tts_host, self.tts_port)
+
+                            self.state = "listening"
+                            self._send_state(ws, "listening")
+                            self.audio_buffer = []
+                            self.speech_started = False
+                            self.silence_duration = 0.0
+                            return
+
+                    # If we reach here, it's a CONVERSATION - continue to LLM
+                    print("[CHAT] Conversation mode - sending to LLM")
+
+                # ============================================================
+                # END VOICE CONTROL - Continue to LLM for conversation
+                # ============================================================
 
                 # Send user transcript immediately to web interface
                 self._send_transcript(ws, f"You: {transcript}", replace=True)
@@ -1841,7 +2092,7 @@ class WebStreamingAssistant:
                 # Update state to speaking (will start streaming LLM + TTS)
                 self.state = "speaking"
                 self._send_state(ws, "speaking")
-                print("🗣️ State → SPEAKING (streaming pipeline)")
+                print("[STATE] Speaking (streaming pipeline)")
 
                 # Small delay to ensure state update is sent
                 time.sleep(0.1)
@@ -1862,10 +2113,10 @@ class WebStreamingAssistant:
                         self._save_conversation(transcript, llm_response)
 
                         if was_interrupted:
-                            print("🎤 User interrupted - ready for new input")
+                            print("[MIC] User interrupted - ready for new input")
 
                 except Exception as e:
-                    print(f"❌ Streaming pipeline failed: {e}")
+                    print(f"[ERR] Streaming pipeline failed: {e}")
                     import traceback
                     traceback.print_exc()
 
@@ -1878,7 +2129,7 @@ class WebStreamingAssistant:
                         self._save_conversation(transcript, llm_response)
                         self._generate_and_play_tts_chunked(llm_response, ws)
                     except Exception as fallback_e:
-                        print(f"❌ Fallback also failed: {fallback_e}")
+                        print(f"[ERR] Fallback also failed: {fallback_e}")
                         self._send_transcript(ws, f"\n\nAI: I'm having trouble responding right now.")
 
                 finally:
@@ -1888,7 +2139,7 @@ class WebStreamingAssistant:
                 # Back to listening state
                 self.state = "listening"
                 self._send_state(ws, "listening")
-                print("🎧 State → LISTENING (ready for next utterance)")
+                print("[LISTEN] State → LISTENING (ready for next utterance)")
 
             except sr.UnknownValueError:
                 self._send_error(ws, "Could not understand audio")
@@ -1900,7 +2151,7 @@ class WebStreamingAssistant:
                 self._send_state(ws, "listening")
 
         except Exception as e:
-            print(f"❌ Error in audio processing pipeline: {e}")
+            print(f"[ERR] Error in audio processing pipeline: {e}")
             self._send_error(ws, str(e))
             self.state = "listening"
             self._send_state(ws, "listening")
@@ -1915,7 +2166,7 @@ class WebStreamingAssistant:
                 'state': state
             }))
         except Exception as e:
-            print(f"⚠️  Error sending state: {e}")
+            print(f"[WARN]  Error sending state: {e}")
 
     def _send_transcript(self, ws, text, replace=False):
         """Send transcript update to client"""
@@ -1926,7 +2177,43 @@ class WebStreamingAssistant:
                 'replace': replace  # If True, replace entire transcript; if False, append
             }))
         except Exception as e:
-            print(f"⚠️  Error sending transcript: {e}")
+            print(f"[WARN]  Error sending transcript: {e}")
+
+    def _on_gatekeeper_response(self, response: dict):
+        """Gatekeeper response callback - G1 se async response handle karo"""
+        print(f"[GATE] Gatekeeper response: {response}")
+        self.gatekeeper_response = response
+        if self.gatekeeper_response_event:
+            self.gatekeeper_response_event.set()
+
+    def _wait_for_gatekeeper_response(self, timeout: float = 2.0) -> dict:
+        """Wait for gatekeeper response with timeout"""
+        if not self.gatekeeper_response_event:
+            return None
+
+        self.gatekeeper_response_event.clear()
+        self.gatekeeper_response = None
+
+        # Wait for response
+        if self.gatekeeper_response_event.wait(timeout):
+            return self.gatekeeper_response
+        return None
+
+    def _get_rejection_speech(self, response: dict) -> str:
+        """Convert rejection reason to spoken message"""
+        code = response.get('rejection_code', '')
+        reason = response.get('rejection_reason', '')
+        action = response.get('action_name', '')
+
+        rejection_speech = {
+            'fsm_invalid': "I need to stand up first. Say stand up.",
+            'unknown_action': f"I can't do {action}. Try wave, high five, or walk.",
+            'low_confidence': "I didn't understand. Could you say that again?",
+            'semantic_veto': "That sounds like a question. Would you like to ask me something?",
+            'arm_not_ready': "Arm controller is not ready. Please wait a moment.",
+            'task_running': "I'm already doing something. Let me finish first.",
+        }
+        return rejection_speech.get(code, reason or "Action failed. Please try again.")
 
     def _query_rag(self, user_message):
         """Query RAG agent (synchronous, returns full response)"""
@@ -1934,12 +2221,12 @@ class WebStreamingAssistant:
             return None
 
         try:
-            print(f"🧠 Querying RAG Agent...")
+            print(f"[LLM] Querying RAG Agent...")
             response = self.rag_agent.chat(user_message)
-            print(f"✅ RAG response: {response[:100]}..." if len(response) > 100 else f"✅ RAG response: {response}")
+            print(f"[OK] RAG response: {response[:100]}..." if len(response) > 100 else f"[OK] RAG response: {response}")
             return response
         except Exception as e:
-            print(f"❌ RAG query failed: {e}")
+            print(f"[ERR] RAG query failed: {e}")
             return None
 
     def _call_ollama(self, user_message):
@@ -1964,7 +2251,7 @@ class WebStreamingAssistant:
                 }
             }
 
-            print(f"🧠 Querying LLM: {self.llm_model} @ {self.ollama_url} (temp={self.llm_temperature})")
+            print(f"[LLM] Querying LLM: {self.llm_model} @ {self.ollama_url} (temp={self.llm_temperature})")
             response = requests.post(self.ollama_url, json=payload, stream=True, timeout=300)
             response.raise_for_status()
 
@@ -1987,10 +2274,10 @@ class WebStreamingAssistant:
             })
 
         except requests.exceptions.ConnectionError:
-            print(f"❌ Cannot connect to Ollama at {self.ollama_url}")
+            print(f"[ERR] Cannot connect to Ollama at {self.ollama_url}")
             raise
         except Exception as e:
-            print(f"❌ LLM error: {e}")
+            print(f"[ERR] LLM error: {e}")
             raise
 
     def _check_interrupted(self):
@@ -1998,7 +2285,7 @@ class WebStreamingAssistant:
         interrupted = self.interrupt_monitor.is_interrupted()
         # Log when interrupt flag is True (only once per check to avoid spam)
         if interrupted:
-            print(f"    ✓ _check_interrupted: background monitor detected interrupt!")
+            print(f"    + _check_interrupted: background monitor detected interrupt!")
         return interrupted
 
 
@@ -2008,7 +2295,7 @@ class WebStreamingAssistant:
         Pipeline: LLM tokens → Buffer → TTS Generator → Audio Player
         All stages run in parallel for minimal latency.
         """
-        print("\n🚀 Starting streaming LLM + TTS pipeline...")
+        print("\n[START] Starting streaming LLM + TTS pipeline...")
 
         # Initialize pipeline components
         audio_player = AudioPlayer(interrupt_monitor=self.interrupt_monitor, completion_threshold=0.75)
@@ -2031,6 +2318,14 @@ class WebStreamingAssistant:
         self.active_audio_player = audio_player
         self.active_tts_generator = tts_generator
 
+        # Apply current gain/volume from audio_control_state
+        try:
+            effective_gain = audio_control_state['gain'] * (audio_control_state['volume'] / 100.0)
+            audio_player.stream_manager.g1_gain = effective_gain
+            print(f"[AUDIO] Applied gain: {effective_gain:.2f} (base: {audio_control_state['gain']}, vol: {audio_control_state['volume']}%)")
+        except Exception as e:
+            print(f"[AUDIO] Could not apply gain: {e}")
+
         # Start worker threads
         audio_player.start()
         tts_generator.start()
@@ -2052,13 +2347,13 @@ class WebStreamingAssistant:
             # Use RAG if available, otherwise stream from Ollama
             if self.rag_agent:
                 # RAG mode: Get full response synchronously, then process for TTS
-                print(f"🧠 Using RAG Agent for query...")
+                print(f"[LLM] Using RAG Agent for query...")
                 rag_response = self._query_rag(user_message)
 
                 if rag_response:
                     full_response = rag_response
                     ttft = time.time() - start_time
-                    print(f"  ⚡ RAG response time: {ttft:.3f}s")
+                    print(f"  [FAST] RAG response time: {ttft:.3f}s")
 
                     # Clean and chunk the response for TTS
                     clean_response = clean_text_for_tts(full_response)
@@ -2068,7 +2363,7 @@ class WebStreamingAssistant:
                         # Queue ALL chunks to TTS generator first (they generate in sequence)
                         for i, chunk in enumerate(tts_chunks):
                             tts_generator.add_text(chunk)
-                        print(f"  📝 Queued {len(tts_chunks)} TTS chunks")
+                        print(f"  [STT] Queued {len(tts_chunks)} TTS chunks")
 
                     # Update transcript
                     self._send_transcript(ws, f"You: {user_message}\n\nINDU: {full_response}", replace=True)
@@ -2086,7 +2381,7 @@ class WebStreamingAssistant:
                         time.sleep(0.05)
 
                     total_time = time.time() - start_time
-                    print(f"✅ RAG pipeline complete ({total_time:.2f}s)")
+                    print(f"[OK] RAG pipeline complete ({total_time:.2f}s)")
 
                     # Clear active references (playback complete)
                     self.active_audio_player = None
@@ -2099,7 +2394,7 @@ class WebStreamingAssistant:
 
                     return full_response, audio_player.interrupted
                 else:
-                    print("⚠️ RAG returned empty, falling back to direct Ollama")
+                    print("[WARN] RAG returned empty, falling back to direct Ollama")
 
             # Fallback: Stream from LLM directly (no RAG)
             payload = {
@@ -2111,14 +2406,14 @@ class WebStreamingAssistant:
                 }
             }
 
-            print(f"🧠 Streaming from LLM: {self.llm_model} (temp={self.llm_temperature})")
+            print(f"[LLM] Streaming from LLM: {self.llm_model} (temp={self.llm_temperature})")
             response = requests.post(self.ollama_url, json=payload, stream=True, timeout=300)
             response.raise_for_status()
 
             for line in response.iter_lines():
                 # Check for interrupt
                 if audio_player.interrupted:
-                    print("🛑 Pipeline interrupted, stopping LLM stream")
+                    print("[STOP] Pipeline interrupted, stopping LLM stream")
                     break
 
                 if line:
@@ -2129,7 +2424,7 @@ class WebStreamingAssistant:
 
                             if first_token:
                                 ttft = time.time() - start_time
-                                print(f"  ⚡ TTFT: {ttft:.3f}s")
+                                print(f"  [FAST] TTFT: {ttft:.3f}s")
                                 first_token = False
 
                             # Add token to buffers
@@ -2169,7 +2464,7 @@ class WebStreamingAssistant:
             self.messages.append({"role": "assistant", "content": full_response})
 
             llm_time = time.time() - start_time
-            print(f"\n✅ LLM complete ({llm_time:.2f}s) - {len(full_response)} chars, {chunks_sent} chunks")
+            print(f"\n[OK] LLM complete ({llm_time:.2f}s) - {len(full_response)} chars, {chunks_sent} chunks")
 
             # Wait for TTS and audio to finish
             print("⏳ Waiting for audio playback to complete...")
@@ -2179,7 +2474,7 @@ class WebStreamingAssistant:
                 time.sleep(0.1)
 
             total_time = time.time() - start_time
-            print(f"✅ Pipeline complete ({total_time:.2f}s total)")
+            print(f"[OK] Pipeline complete ({total_time:.2f}s total)")
 
             # Clear active references (playback complete)
             self.active_audio_player = None
@@ -2193,7 +2488,7 @@ class WebStreamingAssistant:
             return full_response, audio_player.interrupted
 
         except Exception as e:
-            print(f"❌ Pipeline error: {e}")
+            print(f"[ERR] Pipeline error: {e}")
             # Clear active references on error too
             self.active_audio_player = None
             self.active_tts_generator = None
@@ -2225,7 +2520,7 @@ class WebStreamingAssistant:
         if len(chunks) == 0:
             return False
 
-        print(f"🔊 Speaking ({len(chunks)} chunks)...")
+        print(f"[TTS] Speaking ({len(chunks)} chunks)...")
 
         # Pre-generate chunks using asyncio
         audio_paths = [None] * len(chunks)
@@ -2242,7 +2537,7 @@ class WebStreamingAssistant:
                     volume=self.tts_volume
                 )
             except Exception as e:
-                print(f"\n❌ Error generating chunk {idx+1}: {e}")
+                print(f"\n[ERR] Error generating chunk {idx+1}: {e}")
                 audio_paths[idx] = None
 
         async def generate_chunks_async():
@@ -2255,7 +2550,7 @@ class WebStreamingAssistant:
                 # Check for interrupts before processing chunk
                 if self._check_interrupted():
                     remaining = len(chunks) - i
-                    print(f"\n🎤 Interrupted! Discarding {remaining} remaining chunks")
+                    print(f"\n[MIC] Interrupted! Discarding {remaining} remaining chunks")
                     return True
 
                 # Wait for current chunk to be ready
@@ -2265,7 +2560,7 @@ class WebStreamingAssistant:
                 audio_path = audio_paths[i]
 
                 if not audio_path:
-                    print(f"  ⚠️  Chunk {i+1} generation failed, skipping...")
+                    print(f"  [WARN]  Chunk {i+1} generation failed, skipping...")
                     continue
 
                 # Start generating next chunk(s) in parallel
@@ -2284,13 +2579,13 @@ class WebStreamingAssistant:
 
                 if interrupted:
                     remaining = len(chunks) - (i + 1)
-                    print(f"\n🎤 Interrupted! Discarding {remaining} remaining chunks")
+                    print(f"\n[MIC] Interrupted! Discarding {remaining} remaining chunks")
                     return True
 
                 # Small buffer between chunks
                 time.sleep(0.05)
 
-            print("\n✅ Done speaking\n")
+            print("\n[OK] Done speaking\n")
             return False
 
         # Run the async generation and playback
@@ -2320,7 +2615,7 @@ class WebStreamingAssistant:
                         elif isinstance(data, dict) and 'conversations' in data:
                             conversations = data['conversations']
                 except Exception as e:
-                    print(f"⚠️  Error loading conversations file: {e}")
+                    print(f"[WARN]  Error loading conversations file: {e}")
                     conversations = []
 
             # Append new conversation
@@ -2333,10 +2628,10 @@ class WebStreamingAssistant:
                     "total_count": len(conversations)
                 }, f, indent=2, ensure_ascii=False)
 
-            print(f"💾 Conversation saved to {CONVERSATIONS_FILE} (total: {len(conversations)})")
+            print(f"[SAVE] Conversation saved to {CONVERSATIONS_FILE} (total: {len(conversations)})")
 
         except Exception as e:
-            print(f"❌ Error saving conversation: {e}")
+            print(f"[ERR] Error saving conversation: {e}")
 
     def _send_error(self, ws, error):
         """Send error message to client"""
@@ -2346,7 +2641,7 @@ class WebStreamingAssistant:
                 'error': error
             }))
         except Exception as e:
-            print(f"⚠️  Error sending error message: {e}")
+            print(f"[WARN]  Error sending error message: {e}")
 
 
 # Global streaming assistant instance
@@ -2467,7 +2762,7 @@ def get_edge_voices():
         # If cache doesn't exist, generate it
         if not cache_file.exists():
             import asyncio
-            print("⚠️  Voice cache not found, fetching from Edge TTS...")
+            print("[WARN]  Voice cache not found, fetching from Edge TTS...")
             voices = asyncio.run(edge_tts.list_voices())
 
             # Build cache
@@ -2545,7 +2840,7 @@ def get_ollama_models():
                     models = cache_data.get('models', [])
                     from_cache = True
             except Exception as e:
-                print(f"⚠️  Error loading model cache: {e}")
+                print(f"[WARN]  Error loading model cache: {e}")
 
         # If cache is empty or doesn't exist, try live API
         if not models:
@@ -2594,6 +2889,170 @@ def health_check():
     })
 
 
+# ============================================================
+# AUDIO CONTROL ENDPOINTS
+# ============================================================
+
+# Global audio control state - gain synced from config.json
+def _get_config_gain():
+    """Config se gain value read karo"""
+    try:
+        config_path = Path(__file__).parent / "config.json"
+        with open(config_path) as f:
+            config = json.load(f)
+        return config.get("g1_audio", {}).get("gain", 1.0)
+    except:
+        return 1.0
+
+audio_control_state = {
+    'muted': False,
+    'stopped': False,  # Audio output stopped flag
+    'volume': 100,  # 0-100
+    'gain': _get_config_gain()  # 0-6, config.json se sync
+}
+
+@app.route('/api/audio/stop', methods=['POST'])
+def api_stop_audio():
+    """Instantly stop all audio playback and TTS generation"""
+    global streaming_assistant
+
+    try:
+        # Stop active audio player
+        if streaming_assistant.active_audio_player:
+            streaming_assistant.active_audio_player.stop()
+            streaming_assistant.active_audio_player.interrupted = True
+
+        # Stop active TTS generator
+        if streaming_assistant.active_tts_generator:
+            streaming_assistant.active_tts_generator.stop()
+
+        # G1 pe bhi stop bhejo
+        g1_config = streaming_assistant.stream_manager.__dict__.get('g1_url')
+        if g1_config:
+            try:
+                stop_url = g1_config.replace('/play_audio', '/stop')
+                requests.post(stop_url, timeout=1)
+            except:
+                pass
+
+        audio_control_state['stopped'] = True
+        return jsonify({'success': True, 'message': 'Audio stopped'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audio/resume', methods=['POST'])
+def api_resume_audio():
+    """Resume audio output (clear stopped state)"""
+    global audio_control_state
+
+    try:
+        audio_control_state['stopped'] = False
+        return jsonify({'success': True, 'message': 'Audio resumed'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audio/mute', methods=['POST'])
+def api_mute_audio():
+    """Mute/unmute G1 audio output"""
+    global audio_control_state, streaming_assistant
+
+    try:
+        data = request.get_json(silent=True) or {}
+
+        if 'muted' in data:
+            audio_control_state['muted'] = bool(data['muted'])
+        else:
+            # Toggle
+            audio_control_state['muted'] = not audio_control_state['muted']
+
+        # G1 pe bhi mute state bhejo
+        g1_config = streaming_assistant.stream_manager.__dict__.get('g1_url')
+        if g1_config:
+            try:
+                mute_url = g1_config.replace('/play_audio', '/mute')
+                requests.post(mute_url, json={'muted': audio_control_state['muted']}, timeout=1)
+            except:
+                pass
+
+        return jsonify({'success': True, 'muted': audio_control_state['muted']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audio/volume', methods=['POST'])
+def api_set_volume():
+    """Set audio volume (0-100)"""
+    global audio_control_state, streaming_assistant
+
+    try:
+        data = request.get_json(silent=True) or {}
+        volume = int(data.get('volume', 100))
+        volume = max(0, min(100, volume))  # Clamp 0-100
+
+        audio_control_state['volume'] = volume
+
+        # Volume as multiplier (0-100 -> 0.0-1.0) apply to gain
+        # Effective gain = base_gain * (volume/100)
+        applied = False
+        base_gain = audio_control_state['gain']
+        effective_gain = base_gain * (volume / 100.0)
+
+        # Apply to active audio player if exists
+        if streaming_assistant and streaming_assistant.active_audio_player:
+            try:
+                streaming_assistant.active_audio_player.stream_manager.g1_gain = effective_gain
+                applied = True
+            except:
+                pass
+
+        print(f"[AUDIO] Volume set to {volume}, effective gain: {effective_gain:.2f}, applied: {applied}")
+        return jsonify({'success': True, 'volume': volume, 'applied': applied})
+    except Exception as e:
+        print(f"[AUDIO ERROR] Volume set failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audio/gain', methods=['POST'])
+def api_set_gain():
+    """Set audio gain (0-6)"""
+    global audio_control_state, streaming_assistant
+
+    try:
+        data = request.get_json(silent=True) or {}
+        gain = float(data.get('gain', 2.0))
+        gain = max(0.0, min(6.0, gain))  # Clamp 0-6
+
+        audio_control_state['gain'] = gain
+
+        # Apply gain with volume multiplier
+        applied = False
+        volume = audio_control_state['volume']
+        effective_gain = gain * (volume / 100.0)
+
+        # Apply to active audio player if exists
+        if streaming_assistant and streaming_assistant.active_audio_player:
+            try:
+                streaming_assistant.active_audio_player.stream_manager.g1_gain = effective_gain
+                applied = True
+            except:
+                pass
+
+        print(f"[AUDIO] Gain set to {gain}, effective gain: {effective_gain:.2f}, applied: {applied}")
+        return jsonify({'success': True, 'gain': gain, 'applied': applied})
+    except Exception as e:
+        print(f"[AUDIO ERROR] Gain set failed: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/audio/status', methods=['GET'])
+def api_audio_status():
+    """Get current audio control state"""
+    global audio_control_state
+    return jsonify(audio_control_state)
+
+
 @app.route('/api/calibrate', methods=['POST'])
 def trigger_calibration():
     """Run audio calibration via web UI"""
@@ -2625,7 +3084,7 @@ def trigger_calibration():
 @sock.route('/ws/stream')
 def stream_websocket(ws):
     """WebSocket endpoint for audio streaming"""
-    print("📡 New WebSocket connection established")
+    print("[NET] New WebSocket connection established")
 
     try:
         # Send initial state
@@ -2648,9 +3107,9 @@ def stream_websocket(ws):
                 streaming_assistant.process_audio_chunk(data, ws)
 
     except Exception as e:
-        print(f"❌ WebSocket error: {e}")
+        print(f"[ERR] WebSocket error: {e}")
     finally:
-        print("📡 WebSocket connection closed")
+        print("[NET] WebSocket connection closed")
         # Clean up - stop playback, reset state, publish ROS2 False
         streaming_assistant.cleanup()
 
@@ -2669,16 +3128,16 @@ def run_config_server(host='127.0.0.1', port=8080, use_ssl=False):
 
             if cert_file.exists() and key_file.exists():
                 ssl_context = (str(cert_file), str(key_file))
-                print(f"🔒 HTTPS enabled - SSL certificates found")
+                print(f"[SSL] HTTPS enabled - SSL certificates found")
                 app.run(host=host, port=port, debug=False, use_reloader=False,
                        threaded=True, ssl_context=ssl_context)
             else:
-                print(f"⚠️  SSL certificates not found, falling back to HTTP")
+                print(f"[WARN]  SSL certificates not found, falling back to HTTP")
                 app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
         else:
             app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
     except Exception as e:
-        print(f"❌ Config server error: {e}")
+        print(f"[ERR] Config server error: {e}")
 
 
 def start_config_server_thread(host='127.0.0.1', port=8080, use_ssl=False):
@@ -2707,12 +3166,12 @@ if __name__ == "__main__":
     print("=" * 70)
     print("BR_AI_N Voice Assistant - Configuration Server")
     print("=" * 70)
-    print(f"\n📡 Server URLs:")
+    print(f"\n[NET] Server URLs:")
     print(f"   http://127.0.0.1:8080/config  (Configuration)")
     print(f"   http://{local_ip}:8080/stream  (Streaming Voice Assistant)")
     print(f"\n   Or with HTTPS (for remote microphone access):")
     print(f"   https://{local_ip}:8080/stream")
-    print(f"\n⚠️  For HTTPS: Accept the security warning in your browser")
+    print(f"\n[WARN]  For HTTPS: Accept the security warning in your browser")
     print("=" * 70)
     print("Press Ctrl+C to stop\n")
 
