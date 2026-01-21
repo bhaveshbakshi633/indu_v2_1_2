@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>BR_AI_N Voice Assistant</title>
+    <!-- Three.js Library (Local) -->
+    <script src="/static/js/three.min.js"></script>
+    <!-- Simplex Noise Library (Local) -->
+    <script src="/static/js/simplex-noise.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg-primary: #0A0A0A;
+            --bg-secondary: #1A1A1A;
+            --bg-tertiary: #2A2A2A;
+            --text-primary: #FFFFFF;
+            --text-secondary: #A0A0A0;
+            --accent-blue: #3B82F6;
+            --accent-green: #10B981;
+            --accent-orange: #F59E0B;
+            --border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .logo .company {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .settings-btn, .mute-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .settings-btn:hover, .mute-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .mute-btn.muted {
+            background: #DC2626;
+            border-color: #DC2626;
+            color: white;
+        }
+
+        .mute-btn.muted:hover {
+            background: #B91C1C;
+        }
+
+        .mute-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
+
+        /* Audio Control Buttons */
+        .stop-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stop-btn:hover {
+            background: #DC2626;
+            border-color: #DC2626;
+            color: white;
+        }
+
+        .stop-btn.stopped {
+            background: #DC2626;
+            border-color: #DC2626;
+            color: white;
+        }
+
+        .stop-btn.stopped:hover {
+            background: #22C55E;
+            border-color: #22C55E;
+        }
+
+        .mute-g1-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mute-g1-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .mute-g1-btn.muted {
+            background: #F59E0B;
+            border-color: #F59E0B;
+            color: white;
+        }
+
+        /* Audio Control Panel */
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 8px 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 50px;
+        }
+
+        .control-slider {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border-color);
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        .control-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .control-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .control-value {
+            font-size: 11px;
+            color: var(--text-primary);
+            min-width: 30px;
+            text-align: right;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* Voice Orb Container */
+        .orb-container {
+            margin: 60px 0 40px 0;
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #three-canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+
+        .voice-orb {
+            width: 400px;
+            height: 400px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        /* Orb States - handled by Three.js now */
+
+        /* Wave Bars (inside orb) - Hidden, using 3D torus instead */
+        .wave-bars {
+            display: none !important;
+        }
+
+        .wave-bar {
+            width: 4px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .wave-bar:nth-child(1) { animation-delay: 0s; height: 15px; }
+        .wave-bar:nth-child(2) { animation-delay: 0.1s; height: 25px; }
+        .wave-bar:nth-child(3) { animation-delay: 0.2s; height: 35px; }
+        .wave-bar:nth-child(4) { animation-delay: 0.3s; height: 40px; }
+        .wave-bar:nth-child(5) { animation-delay: 0.4s; height: 35px; }
+        .wave-bar:nth-child(6) { animation-delay: 0.5s; height: 25px; }
+        .wave-bar:nth-child(7) { animation-delay: 0.6s; height: 15px; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.5); }
+            50% { transform: scaleY(1); }
+        }
+
+
+        /* Status Text */
+        .status-text {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 16px;
+            color: var(--text-secondary);
+            min-height: 24px;
+        }
+
+        .status-text.listening {
+            color: var(--accent-blue);
+        }
+
+        .status-text.transcribing {
+            color: var(--accent-orange);
+        }
+
+        .status-text.speaking {
+            color: var(--accent-green);
+        }
+
+        /* Conversation Section */
+        .conversation-section {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 40px;
+        }
+
+        .conversation-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .conversation-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .conversation-content {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .conversation-content.empty {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        .read-more-link {
+            display: inline-block;
+            color: var(--accent-blue);
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 8px;
+            font-size: 14px;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .read-more-link:hover {
+            opacity: 0.7;
+        }
+
+        .conversation-content.truncated {
+            max-height: none;
+        }
+
+        /* Connection Status */
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .connection-status.visible {
+            opacity: 1;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-dot.connected {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        /* Error Message */
+        .error-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #DC2626;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            max-width: 90%;
+            display: none;
+            z-index: 1000;
+        }
+
+        .error-message.active {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 20px);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .header {
+                padding: 16px;
+            }
+
+            .logo h1 {
+                font-size: 20px;
+            }
+
+            .header-buttons {
+                gap: 8px;
+            }
+
+            .settings-btn, .mute-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .mute-icon {
+                width: 14px;
+                height: 14px;
+            }
+
+            /* Mobile audio controls */
+            .header-buttons {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .stop-btn, .mute-g1-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .audio-controls {
+                width: 100%;
+                order: 10;
+                margin-top: 8px;
+                padding: 6px 12px;
+                gap: 10px;
+            }
+
+            .control-slider {
+                width: 60px;
+            }
+
+            .control-label {
+                font-size: 10px;
+                min-width: 35px;
+            }
+
+            .control-value {
+                font-size: 10px;
+                min-width: 25px;
+            }
+
+            .orb-container {
+                margin: 40px 0 30px 0;
+                width: 300px;
+                height: 300px;
+            }
+
+            .voice-orb {
+                width: 300px;
+                height: 300px;
+            }
+
+            .status-text {
+                font-size: 14px;
+            }
+
+            .conversation-section {
+                margin-top: 30px;
+            }
+
+            .conversation-card {
+                padding: 16px;
+            }
+
+            .conversation-label {
+                font-size: 11px;
+            }
+
+            .conversation-content {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 16px;
+            }
+
+            .orb-container {
+                width: 250px;
+                height: 250px;
+            }
+
+            .voice-orb {
+                width: 250px;
+                height: 250px;
+            }
+        }
+
+        /* Smooth scrolling */
+        .main-content {
+            scroll-behavior: smooth;
+        }
+
+        /* Loading state */
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            animation: fade 1.5s infinite;
+        }
+
+        @keyframes fade {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <h1>BR_AI_N</h1>
+            <div class="company">SS Innovations Private Limited</div>
+        </div>
+        <div class="header-buttons">
+            <!-- Mic Mute (existing) -->
+            <button class="mute-btn" id="muteBtn" onclick="toggleMute()">
+                <span class="mute-icon">🎤</span>
+                <span id="muteText">Mute</span>
+            </button>
+
+            <!-- Stop Audio Button -->
+            <button class="stop-btn" id="stopBtn" onclick="stopAudio()">
+                <span>⏹</span>
+                <span>Stop</span>
+            </button>
+
+            <!-- Mute G1 Speaker Button -->
+            <button class="mute-g1-btn" id="muteG1Btn" onclick="toggleMuteG1()">
+                <span id="muteG1Icon">🔊</span>
+                <span id="muteG1Text">G1</span>
+            </button>
+
+            <!-- Volume & Gain Controls -->
+            <div class="audio-controls">
+                <div class="control-group">
+                    <span class="control-label">Vol</span>
+                    <input type="range" class="control-slider" id="volumeSlider"
+                           min="0" max="100" value="100" oninput="setVolume(this.value)">
+                    <span class="control-value" id="volumeValue">100</span>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Gain</span>
+                    <input type="range" class="control-slider" id="gainSlider"
+                           min="0" max="6" step="0.5" value="1" oninput="setGain(this.value)">
+                    <span class="control-value" id="gainValue">1.0</span>
+                </div>
+            </div>
+
+            <a href="/config" class="settings-btn">Settings</a>
+        </div>
+    </div>
+
+    <!-- Connection Status (floating) -->
+    <div class="connection-status" id="connectionStatus">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Voice Orb -->
+        <div class="orb-container">
+            <div id="canvas-container">
+                <canvas id="three-canvas"></canvas>
+            </div>
+            <div class="voice-orb" id="voiceOrb">
+                <div class="wave-bars" id="waveBars">
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Text -->
+        <div class="status-text" id="statusDisplay">
+            <span class="loading-text">Initializing...</span>
+        </div>
+
+        <!-- Conversation Section -->
+        <div class="conversation-section">
+            <!-- User Input Card -->
+            <div class="conversation-card">
+                <div class="conversation-label">User</div>
+                <div class="conversation-content empty" id="userBox">Waiting for your voice...</div>
+            </div>
+
+            <!-- AI Response Card -->
+            <div class="conversation-card">
+                <div class="conversation-label">Response</div>
+                <div class="conversation-content empty" id="aiBox">Ready to assist...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Message -->
+    <div class="error-message" id="errorMessage"></div>
+
+    <script>
+        // ===== Three.js 3D Torus with Simplex Noise =====
+        let scene, camera, renderer, torus, torusMesh;
+        let simplex;
+        let animationFrameId;
+        let torusColor = { r: 0.23, g: 0.51, b: 0.96 }; // Default blue
+
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            const canvas = document.getElementById('three-canvas');
+
+            // Scene setup
+            scene = new THREE.Scene();
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(
+                75,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.z = 3;
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({
+                canvas: canvas,
+                alpha: true,
+                antialias: true
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setClearColor(0x000000, 0);
+
+            // Create torus geometry with more segments for smooth deformation
+            const geometry = new THREE.TorusGeometry(1, 0.4, 64, 128);
+
+            // Store original positions for noise displacement
+            const positionAttribute = geometry.attributes.position;
+            const vertex = new THREE.Vector3();
+            const originalPositions = [];
+
+            for (let i = 0; i < positionAttribute.count; i++) {
+                vertex.fromBufferAttribute(positionAttribute, i);
+                originalPositions.push(vertex.clone());
+            }
+
+            geometry.userData.originalPositions = originalPositions;
+
+            // Material with emissive glow
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x3b82f6,
+                emissive: 0x3b82f6,
+                emissiveIntensity: 0.5,
+                shininess: 100,
+                wireframe: false
+            });
+
+            torusMesh = new THREE.Mesh(geometry, material);
+            scene.add(torusMesh);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            const pointLight1 = new THREE.PointLight(0x3b82f6, 1.5);
+            pointLight1.position.set(2, 2, 2);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0x10b981, 1);
+            pointLight2.position.set(-2, -2, -1);
+            scene.add(pointLight2);
+
+            // Initialize simplex noise
+            simplex = new SimplexNoise();
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Start animation
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            animationFrameId = requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+            const geometry = torusMesh.geometry;
+            const positionAttribute = geometry.attributes.position;
+            const originalPositions = geometry.userData.originalPositions;
+
+            // Apply simplex noise to vertices
+            for (let i = 0; i < positionAttribute.count; i++) {
+                const originalPos = originalPositions[i];
+
+                // Get noise value based on position and time
+                const noiseValue = simplex.noise4D(
+                    originalPos.x * 0.5,
+                    originalPos.y * 0.5,
+                    originalPos.z * 0.5,
+                    time * 0.3
+                );
+
+                // Calculate displacement intensity based on current state and audio level
+                let baseIntensity = 0.1;
+                let audioBoost = audioLevel * 0.3; // Scale audio input to animation
+
+                if (currentState === 'listening') {
+                    baseIntensity = 0.1 + audioBoost;
+                } else if (currentState === 'transcribing') {
+                    baseIntensity = 0.15 + Math.sin(time * 5) * 0.08;
+                } else if (currentState === 'speaking') {
+                    baseIntensity = 0.2 + Math.sin(time * 4) * 0.1;
+                }
+
+                let intensity = baseIntensity;
+
+                // Apply displacement
+                const displacement = noiseValue * intensity;
+                const direction = originalPos.clone().normalize();
+
+                positionAttribute.setXYZ(
+                    i,
+                    originalPos.x + direction.x * displacement,
+                    originalPos.y + direction.y * displacement,
+                    originalPos.z + direction.z * displacement
+                );
+            }
+
+            positionAttribute.needsUpdate = true;
+            geometry.computeVertexNormals();
+
+            // Update color based on state
+            updateTorusColor();
+
+            renderer.render(scene, camera);
+        }
+
+        function updateTorusColor() {
+            const material = torusMesh.material;
+            const targetColor = { ...torusColor };
+
+            // Smoothly interpolate to target color
+            const currentColor = material.color;
+            const lerpFactor = 0.05;
+
+            currentColor.r += (targetColor.r - currentColor.r) * lerpFactor;
+            currentColor.g += (targetColor.g - currentColor.g) * lerpFactor;
+            currentColor.b += (targetColor.b - currentColor.b) * lerpFactor;
+
+            material.emissive.copy(currentColor);
+        }
+
+        function setTorusState(state) {
+            switch(state) {
+                case 'listening':
+                    torusColor = { r: 0.23, g: 0.51, b: 0.96 }; // Blue
+                    break;
+                case 'transcribing':
+                    torusColor = { r: 0.96, g: 0.62, b: 0.04 }; // Orange
+                    break;
+                case 'speaking':
+                    torusColor = { r: 0.06, g: 0.73, b: 0.51 }; // Green
+                    break;
+                default:
+                    torusColor = { r: 0.23, g: 0.51, b: 0.96 }; // Default blue
+            }
+        }
+
+        // ===== End Three.js Code =====
+
+        let audioContext;
+        let mediaStream;
+        let scriptProcessor;
+        let analyser;
+        let audioLevel = 0;
+        let isStreaming = false;
+        let isMuted = false;
+        let currentState = 'idle';
+        let websocket = null;
+
+        const states = {
+            IDLE: 'idle',
+            LISTENING: 'listening',
+            TRANSCRIBING: 'transcribing',
+            SPEAKING: 'speaking'
+        };
+
+        function setState(newState) {
+            console.log(`State change: ${currentState} → ${newState}`);
+            currentState = newState;
+
+            const voiceOrb = document.getElementById('voiceOrb');
+            const statusDisplay = document.getElementById('statusDisplay');
+            const waveBars = document.getElementById('waveBars');
+            const userBox = document.getElementById('userBox');
+            const aiBox = document.getElementById('aiBox');
+
+            // Reset all animations
+            voiceOrb.className = 'voice-orb';
+            statusDisplay.className = 'status-text';
+            waveBars.classList.remove('active');
+
+            // Update 3D torus state
+            setTorusState(newState);
+
+            switch(newState) {
+                case states.LISTENING:
+                    voiceOrb.classList.add('listening');
+                    statusDisplay.classList.add('listening');
+                    statusDisplay.innerHTML = 'Listening...';
+                    waveBars.classList.add('active');
+                    if (userBox.classList.contains('empty')) {
+                        userBox.textContent = 'Speak now...';
+                    }
+                    break;
+
+                case states.TRANSCRIBING:
+                    voiceOrb.classList.add('transcribing');
+                    statusDisplay.classList.add('transcribing');
+                    statusDisplay.textContent = 'Processing your speech...';
+                    userBox.textContent = 'Transcribing...';
+                    userBox.classList.add('empty');
+                    aiBox.textContent = 'Waiting...';
+                    aiBox.classList.add('empty');
+                    break;
+
+                case states.SPEAKING:
+                    voiceOrb.classList.add('speaking');
+                    statusDisplay.classList.add('speaking');
+                    statusDisplay.textContent = 'Speaking...';
+                    break;
+
+                default:
+                    statusDisplay.innerHTML = '<span class="loading-text">Ready</span>';
+                    userBox.textContent = 'Waiting for your voice...';
+                    userBox.classList.add('empty');
+                    aiBox.textContent = 'Ready to assist...';
+                    aiBox.classList.add('empty');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+            setTimeout(() => {
+                errorDiv.classList.remove('active');
+            }, 5000);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const muteBtn = document.getElementById('muteBtn');
+            const muteText = document.getElementById('muteText');
+            const muteIcon = muteBtn.querySelector('.mute-icon');
+
+            if (isMuted) {
+                muteBtn.classList.add('muted');
+                muteText.textContent = 'Unmute';
+                muteIcon.textContent = '🔇';
+                console.log('Microphone muted - audio streaming stopped');
+            } else {
+                muteBtn.classList.remove('muted');
+                muteText.textContent = 'Mute';
+                muteIcon.textContent = '🎤';
+                console.log('Microphone unmuted - audio streaming resumed');
+            }
+        }
+
+        // G1 Audio Control Functions
+        let isG1Muted = false;
+        let isStopped = false;
+
+        function stopAudio() {
+            const btn = document.getElementById('stopBtn');
+            isStopped = !isStopped;
+
+            if (isStopped) {
+                // Stop audio
+                fetch('/api/audio/stop', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        btn.classList.add('stopped');
+                        btn.innerHTML = '<span>▶</span><span>Resume</span>';
+                        console.log('Audio stopped:', data);
+                    })
+                    .catch(err => console.error('Stop audio failed:', err));
+            } else {
+                // Resume audio (just clear stopped state)
+                fetch('/api/audio/resume', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        btn.classList.remove('stopped');
+                        btn.innerHTML = '<span>⏹</span><span>Stop</span>';
+                        console.log('Audio resumed:', data);
+                    })
+                    .catch(err => {
+                        // Agar resume endpoint nahi hai to bhi UI update kar do
+                        btn.classList.remove('stopped');
+                        btn.innerHTML = '<span>⏹</span><span>Stop</span>';
+                    });
+            }
+        }
+
+        function toggleMuteG1() {
+            isG1Muted = !isG1Muted;
+            const btn = document.getElementById('muteG1Btn');
+            const icon = document.getElementById('muteG1Icon');
+
+            fetch('/api/audio/mute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ muted: isG1Muted })
+            })
+            .then(response => response.json())
+            .then(data => {
+                isG1Muted = data.muted;
+                if (isG1Muted) {
+                    btn.classList.add('muted');
+                    icon.textContent = '🔇';
+                } else {
+                    btn.classList.remove('muted');
+                    icon.textContent = '🔊';
+                }
+                console.log('G1 mute state:', isG1Muted);
+            })
+            .catch(err => console.error('Mute toggle failed:', err));
+        }
+
+        function setVolume(value) {
+            document.getElementById('volumeValue').textContent = value;
+            fetch('/api/audio/volume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: parseInt(value) })
+            })
+            .then(response => response.json())
+            .then(data => console.log('Volume set:', data.volume))
+            .catch(err => console.error('Set volume failed:', err));
+        }
+
+        function setGain(value) {
+            document.getElementById('gainValue').textContent = parseFloat(value).toFixed(1);
+            fetch('/api/audio/gain', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gain: parseFloat(value) })
+            })
+            .then(response => response.json())
+            .then(data => console.log('Gain set:', data.gain))
+            .catch(err => console.error('Set gain failed:', err));
+        }
+
+        // Load current audio control state on page load
+        function loadAudioControlState() {
+            fetch('/api/audio/status')
+                .then(response => response.json())
+                .then(data => {
+                    // Set volume slider
+                    document.getElementById('volumeSlider').value = data.volume;
+                    document.getElementById('volumeValue').textContent = data.volume;
+
+                    // Set gain slider
+                    document.getElementById('gainSlider').value = data.gain;
+                    document.getElementById('gainValue').textContent = data.gain.toFixed(1);
+
+                    // Set mute state
+                    isG1Muted = data.muted;
+                    const btn = document.getElementById('muteG1Btn');
+                    const icon = document.getElementById('muteG1Icon');
+                    if (isG1Muted) {
+                        btn.classList.add('muted');
+                        icon.textContent = '🔇';
+                    }
+                })
+                .catch(err => console.log('Could not load audio state:', err));
+        }
+
+        // Store full AI response for expand/collapse
+        let fullAiResponse = '';
+        let isExpanded = true; // Default: show full text
+
+        function updateTranscript(text) {
+            const parts = text.split('\n\n');
+            const userBox = document.getElementById('userBox');
+            const aiBox = document.getElementById('aiBox');
+            const aiCard = aiBox.parentElement;
+
+            parts.forEach(part => {
+                // Handle both "User:" and "You:" prefixes
+                if (part.startsWith('User:') || part.startsWith('You:')) {
+                    const prefixLen = part.startsWith('User:') ? 5 : 4;
+                    const userText = part.substring(prefixLen).trim();
+                    userBox.textContent = userText;
+                    userBox.classList.remove('empty');
+                // Handle both "AI:" and "INDU:" prefixes
+                } else if (part.startsWith('AI:') || part.startsWith('INDU:')) {
+                    const prefixLen = part.startsWith('AI:') ? 3 : 5;
+                    const aiText = part.substring(prefixLen).trim();
+
+                    // Store full response
+                    fullAiResponse = aiText;
+
+                    // Always show full text (no truncation)
+                    aiBox.textContent = aiText;
+                    aiBox.classList.remove('empty');
+                }
+            });
+        }
+
+        function toggleAiText() {
+            isExpanded = !isExpanded;
+            // Re-trigger update with current full response
+            updateTranscript(`You: \n\nINDU: ${fullAiResponse}`);
+        }
+
+        function appendTranscript(text) {
+            updateTranscript(text);
+        }
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/stream`;
+
+            console.log('Connecting to WebSocket:', wsUrl);
+
+            const connectionStatus = document.getElementById('connectionStatus');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            connectionStatus.classList.add('visible');
+            statusText.textContent = 'Connecting...';
+
+            websocket = new WebSocket(wsUrl);
+
+            websocket.onopen = function() {
+                console.log('WebSocket connected');
+                statusDot.classList.add('connected');
+                statusText.textContent = 'Connected';
+
+                // Hide connection status after 2 seconds
+                setTimeout(() => {
+                    connectionStatus.classList.remove('visible');
+                }, 2000);
+
+                if (!isStreaming) {
+                    startStreaming();
+                }
+            };
+
+            websocket.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('WebSocket message:', message);
+
+                    switch(message.type) {
+                        case 'state':
+                            setState(message.state);
+                            break;
+                        case 'transcript':
+                            if (message.replace) {
+                                updateTranscript(message.text);
+                            } else {
+                                appendTranscript(message.text);
+                            }
+                            break;
+                        case 'error':
+                            showError(message.error);
+                            break;
+                    }
+                } catch (err) {
+                    console.error('Error parsing WebSocket message:', err);
+                }
+            };
+
+            websocket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                showError('Connection error - please refresh');
+            };
+
+            websocket.onclose = function() {
+                console.log('WebSocket closed');
+                statusDot.classList.remove('connected');
+                statusText.textContent = 'Reconnecting...';
+                connectionStatus.classList.add('visible');
+
+                setTimeout(connectWebSocket, 2000);
+            };
+        }
+
+        function updateAudioLevel() {
+            if (!analyser) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            // Calculate average volume
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / bufferLength;
+
+            // Normalize to 0-1 range
+            audioLevel = average / 255;
+
+            // Continue monitoring
+            requestAnimationFrame(updateAudioLevel);
+        }
+
+        async function startStreaming() {
+            try {
+                document.getElementById('statusDisplay').innerHTML = '<span class="loading-text">Requesting microphone access...</span>';
+
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                // Create analyser for audio visualization
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+                source.connect(analyser);
+
+                const sourceSampleRate = audioContext.sampleRate;
+                const targetSampleRate = 16000;
+                console.log(`Audio: ${sourceSampleRate}Hz → ${targetSampleRate}Hz`);
+
+                // Start audio level monitoring
+                updateAudioLevel();
+
+                scriptProcessor.onaudioprocess = function(e) {
+                    if (!isStreaming) return;
+                    if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+                    // Get input audio (or use silence if muted)
+                    let inputData;
+                    if (isMuted) {
+                        // Send silence when muted - server continues processing but VAD sees no speech
+                        inputData = new Float32Array(e.inputBuffer.getChannelData(0).length);
+                    } else {
+                        inputData = e.inputBuffer.getChannelData(0);
+                    }
+
+                    // Resample to 16kHz if needed
+                    let resampledData;
+                    if (sourceSampleRate !== targetSampleRate) {
+                        const sampleRateRatio = sourceSampleRate / targetSampleRate;
+                        const newLength = Math.round(inputData.length / sampleRateRatio);
+                        resampledData = new Float32Array(newLength);
+
+                        for (let i = 0; i < newLength; i++) {
+                            const srcIndex = i * sampleRateRatio;
+                            const srcIndexInt = Math.floor(srcIndex);
+                            const fraction = srcIndex - srcIndexInt;
+
+                            const sample1 = inputData[srcIndexInt] || 0;
+                            const sample2 = inputData[Math.min(srcIndexInt + 1, inputData.length - 1)] || 0;
+                            resampledData[i] = sample1 + (sample2 - sample1) * fraction;
+                        }
+                    } else {
+                        resampledData = inputData;
+                    }
+
+                    // Convert float32 to int16 PCM
+                    const pcmData = new Int16Array(resampledData.length);
+                    for (let i = 0; i < resampledData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, resampledData[i]));
+                        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+
+                    // Send to server
+                    try {
+                        websocket.send(pcmData.buffer);
+                    } catch (err) {
+                        console.error('WebSocket send error:', err);
+                    }
+                };
+
+                source.connect(scriptProcessor);
+                scriptProcessor.connect(audioContext.destination);
+
+                isStreaming = true;
+                setState(states.LISTENING);
+
+                console.log('Streaming started - microphone active');
+            } catch (err) {
+                console.error('Error starting stream:', err);
+                showError('Microphone access denied. Please allow microphone access and refresh.');
+            }
+        }
+
+        // Auto-start when page loads
+        window.addEventListener('load', () => {
+            initThreeJS();
+            connectWebSocket();
+            loadAudioControlState();  // Load volume/gain/mute state
+        });
+
+        // Prevent zoom on double-tap (mobile)
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    </script>
+</body>
+</html>

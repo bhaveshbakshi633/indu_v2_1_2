@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Vector Store
+indu_vectorstore/
+
+# Cache & Temporary Files
+*.log
+*.cache
+conversations.json
+edge_voices_cache.json
+ollama_models_cache.json
+calibration_google.json
+
+# Audio Recordings
+test_recordings/
+*.wav
+*.mp3
+!filler_audio/*.mp3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Certificates (don't commit private keys)
+*.pem
+*.key
+*.crt
+
+# Environment
+.env
+.env.local
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Documentation builds
+docs/_build/
+site/

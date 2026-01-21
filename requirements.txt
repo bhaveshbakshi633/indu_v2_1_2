@@ -1,0 +1,28 @@
+# Web Server
+flask
+flask-sock
+
+# Audio Processing & TTS
+edge-tts
+numpy
+sounddevice
+soundfile
+SpeechRecognition
+
+# HTTP Requests
+requests
+
+# RAG Dependencies
+langchain
+langchain-community
+langchain-ollama
+langchain-huggingface
+faiss-cpu
+sentence-transformers
+
+# PyTorch (for embeddings & Silero VAD)
+torch
+torchaudio
+
+# HuggingFace Hub (for model downloads)
+huggingface-hub

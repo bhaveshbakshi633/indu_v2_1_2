@@ -1,0 +1,91 @@
+{
+  "g1_audio": {
+    "enabled": true,
+    "host": "172.16.2.242",
+    "port": 5050,
+    "gain": 0.5
+  },
+  "stt_backend": "whisper_server",
+  "tts_backend": "chatterbox",
+  "ollama_model": "naamika:v1",
+  "ollama_base_url": "http://localhost:11434",
+  "enable_rag": true,
+  "vad_threshold": 0.5,
+  "silence_duration": 0.5,
+  "interrupt_cooldown": 1.5,
+  "tts": {
+    "backend": "chatterbox",
+    "edge": {
+      "voice": "en-IN-NeerjaExpressiveNeural",
+      "rate": "+0%",
+      "pitch": "+0Hz"
+    },
+    "gtts": {
+      "language": "en",
+      "tld": "com"
+    },
+    "pyttsx3": {
+      "rate": 150,
+      "volume": 0.8
+    },
+    "vibevoice": {
+      "host": "172.16.4.226",
+      "port": 8787,
+      "voice": "hi-Aish_woman",
+      "seed": 50,
+      "cfg_scale": 1.4
+    },
+    "chatterbox": {
+      "host": "127.0.0.1",
+      "port": 8000,
+      "fallback": "edge",
+      "fallback_voice": "en-IN-NeerjaExpressiveNeural"
+    }
+  },
+  "stt": {
+    "backend": "whisper_server",
+    "google": {
+      "language": "en-US"
+    },
+    "whisper": {
+      "model_size": "medium",
+      "language": "en"
+    },
+    "whisper_server": {
+      "host": "172.16.4.250",
+      "port": 8001,
+      "model": "medium",
+      "language": "en"
+    }
+  },
+  "llm": {
+    "deployment_mode": "remote",
+    "model": "naamika:v1",
+    "use_rag": true,
+    "local": {
+      "host": "127.0.0.1",
+      "port": 11434
+    },
+    "remote": {
+      "host": "172.16.4.226",
+      "port": 11434
+    },
+    "options": {
+      "temperature": 0.8
+    }
+  },
+  "assistant": {
+    "max_messages": 10,
+    "chunk_size_first": 50,
+    "chunk_size_rest": 150
+  },
+  "web_config": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "web_interface": {
+    "enabled": false,
+    "message": "Not Available - Placeholder"
+  }
+}
