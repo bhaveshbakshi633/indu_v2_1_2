@@ -2401,59 +2401,89 @@ class WebStreamingAssistant:
 
             # Use RAG if available, otherwise stream from Ollama
             if self.rag_agent:
-                # RAG mode: Get full response synchronously, then process for TTS
-                print(f"[LLM] Using RAG Agent for query...")
-                rag_response = self._query_rag(user_message)
+                # RAG mode: Stream tokens for lower Time-To-First-Token
+                print(f"[LLM] Using RAG Agent (streaming) for query...")
 
-                if rag_response:
-                    full_response = rag_response
-                    ttft = time.time() - start_time
-                    print(f"  [FAST] RAG response time: {ttft:.3f}s")
-
-                    # Conversation hai - gestures enable karo PEHLE audio se
-                    has_namaste = 'namaste' in full_response.lower()
-                    set_g1_gesture_mode(True, has_namaste)
-
-                    # Clean and chunk the response for TTS
-                    clean_response = clean_text_for_tts(full_response)
-                    tts_chunks = split_text_into_chunks(clean_response, self.chunk_size_first, self.chunk_size_rest)
-
-                    if tts_chunks:
-                        # Queue ALL chunks to TTS generator first (they generate in sequence)
-                        for i, chunk in enumerate(tts_chunks):
-                            tts_generator.add_text(chunk)
-                        print(f"  [STT] Queued {len(tts_chunks)} TTS chunks")
-
-                    # Update transcript
-                    self._send_transcript(ws, f"You: {user_message}\n\nNAAMIKA: {full_response}", replace=True)
-
-                    # Add to conversation history
-                    self.messages.append({"role": "assistant", "content": full_response})
-
-                    # Signal TTS done and wait for playback
-                    tts_generator.mark_done()
-
-                    print("⏳ Waiting for RAG audio playback...")
-                    while not audio_player.is_done() or not tts_generator.is_done():
+                try:
+                    for token in self.rag_agent.stream_chat(user_message):
+                        # Check for interrupt
                         if audio_player.interrupted:
+                            print("[STOP] Pipeline interrupted, stopping RAG stream")
                             break
-                        time.sleep(0.05)
 
-                    total_time = time.time() - start_time
-                    print(f"[OK] RAG pipeline complete ({total_time:.2f}s)")
+                        if first_token:
+                            ttft = time.time() - start_time
+                            print(f"  [FAST] TTFT: {ttft:.3f}s")
+                            first_token = False
 
-                    # Clear active references (playback complete)
-                    self.active_audio_player = None
-                    self.active_tts_generator = None
+                        # Add token to buffers
+                        buffer += token
+                        full_response += token
 
-                    # Ensure ROS2 playback status is False
-                    ros2_pub = get_ros2_publisher()
-                    if ros2_pub:
-                        ros2_pub.set_playing(False)
+                        # Stream transcript update to web interface (every 100ms or on sentence end)
+                        current_time = time.time()
+                        if current_time - last_transcript_update > 0.1 or token in '.!?\n':
+                            self._send_transcript(ws, f"You: {user_message}\n\nNAAMIKA: {full_response}", replace=True)
+                            last_transcript_update = current_time
 
-                    return full_response, audio_player.interrupted
-                else:
-                    print("[WARN] RAG returned empty, falling back to direct Ollama")
+                        # Check if buffer ready for TTS
+                        chunk_size = self.chunk_size_first if chunks_sent == 0 else self.chunk_size_rest
+
+                        if len(buffer) >= chunk_size or (len(buffer) > 30 and token in '.!?\n'):
+                            clean_buffer = clean_text_for_tts(buffer.strip())
+                            if clean_buffer:
+                                # First chunk pe gesture mode enable karo
+                                if chunks_sent == 0:
+                                    has_namaste = 'namaste' in full_response.lower()
+                                    set_g1_gesture_mode(True, has_namaste)
+                                    send_speech_info_to_g1(full_response, is_confirmation=False)
+                                chunks_sent += 1
+                                tts_generator.add_text(clean_buffer)
+                            buffer = ""
+
+                    # Handle remaining buffer
+                    if buffer.strip() and not audio_player.interrupted:
+                        clean_buffer = clean_text_for_tts(buffer.strip())
+                        if clean_buffer:
+                            chunks_sent += 1
+                            tts_generator.add_text(clean_buffer)
+
+                    # Check if we got a valid response
+                    if full_response.strip():
+                        # Send final transcript update to webapp
+                        self._send_transcript(ws, f"You: {user_message}\n\nNAAMIKA: {full_response}", replace=True)
+                        print(f"[TRANSCRIPT] Final update sent ({len(full_response)} chars)")
+
+                        # Add to conversation history
+                        self.messages.append({"role": "assistant", "content": full_response})
+
+                        # Signal TTS done and wait for playback
+                        tts_generator.mark_done()
+
+                        print("⏳ Waiting for RAG audio playback...")
+                        while not audio_player.is_done() or not tts_generator.is_done():
+                            if audio_player.interrupted:
+                                break
+                            time.sleep(0.05)
+
+                        total_time = time.time() - start_time
+                        print(f"[OK] RAG pipeline complete ({total_time:.2f}s)")
+
+                        # Clear active references (playback complete)
+                        self.active_audio_player = None
+                        self.active_tts_generator = None
+
+                        # Ensure ROS2 playback status is False
+                        ros2_pub = get_ros2_publisher()
+                        if ros2_pub:
+                            ros2_pub.set_playing(False)
+
+                        return full_response, audio_player.interrupted
+                    else:
+                        print("[WARN] RAG stream returned empty, falling back to direct Ollama")
+
+                except Exception as e:
+                    print(f"[WARN] RAG streaming error: {e}, falling back to direct Ollama")
 
             # Fallback: Stream from LLM directly (no RAG)
             payload = {

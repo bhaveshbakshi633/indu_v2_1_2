@@ -6,7 +6,7 @@ Uses Ollama + LangChain + FAISS with HYBRID approach:
 """
 
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Generator
 from langchain_ollama import OllamaLLM
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -210,6 +210,66 @@ RESPONSE:"""
 
         except Exception as e:
             return f"I encountered an error: {str(e)}"
+
+    def stream_chat(self, user_query: str) -> Generator[str, None, None]:
+        """Stream response token by token with conversation memory + RAG.
+
+        Yields tokens as they are generated, allowing TTS to start immediately.
+        Same quality as chat(), just streamed delivery.
+        """
+        try:
+            # Build search query - include previous topic for better retrieval
+            search_query = user_query
+            if self.conversation_history:
+                last_user, last_assistant = self.conversation_history[-1]
+                search_query = f"{last_user} {user_query}"
+
+            # 1. Retrieve relevant context from knowledge base (RAG)
+            rag_context = self._retrieve_context(search_query)
+
+            # 2. Format conversation history (Memory)
+            chat_history = self._format_chat_history()
+
+            # 3. Check if this is a continuation
+            is_continuation = len(self.conversation_history) > 0
+            continuation_note = "[This is a continuation - do not re-introduce yourself]" if is_continuation else ""
+
+            # 4. Build the prompt - System prompt is BAKED into naamika:v1 model
+            prompt = f"""CONVERSATION HISTORY:
+{chat_history if chat_history else "(Start of conversation)"}
+
+RELEVANT KNOWLEDGE BASE FACTS:
+{rag_context if rag_context else "(No specific facts)"}
+
+USER: {user_query}
+{continuation_note}
+
+RESPONSE:"""
+
+            # Debug mode
+            if self.debug_mode:
+                print(f"[STREAM] Prompt: {len(prompt)} chars (~{len(prompt)//4} tokens)")
+
+            # 5. Stream from LLM
+            full_response = ""
+            for token in self.llm.stream(prompt):
+                full_response += token
+                yield token
+
+            # 6. Handle empty responses
+            if not full_response or len(full_response.strip()) < 5:
+                fallback = "I'm specialized in SSi medical robotics. What would you like to know?"
+                yield fallback
+                full_response = fallback
+
+            # 7. Save to conversation history
+            self.conversation_history.append((user_query, full_response.strip()))
+            if len(self.conversation_history) > self.max_history:
+                self.conversation_history = self.conversation_history[-self.max_history:]
+
+        except Exception as e:
+            error_msg = f"I encountered an error: {str(e)}"
+            yield error_msg
 
     def clear_history(self):
         """Clear conversation history"""
