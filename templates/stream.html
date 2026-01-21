@@ -1059,9 +1059,11 @@
                     const userText = part.substring(prefixLen).trim();
                     userBox.textContent = userText;
                     userBox.classList.remove('empty');
-                // Handle both "AI:" and "INDU:" prefixes
-                } else if (part.startsWith('AI:') || part.startsWith('INDU:')) {
-                    const prefixLen = part.startsWith('AI:') ? 3 : 5;
+                // Handle "AI:", "INDU:", and "NAAMIKA:" prefixes
+                } else if (part.startsWith('AI:') || part.startsWith('INDU:') || part.startsWith('NAAMIKA:')) {
+                    let prefixLen = 3; // AI:
+                    if (part.startsWith('INDU:')) prefixLen = 5;
+                    else if (part.startsWith('NAAMIKA:')) prefixLen = 8;
                     const aiText = part.substring(prefixLen).trim();
 
                     // Store full response
@@ -1077,7 +1079,7 @@
         function toggleAiText() {
             isExpanded = !isExpanded;
             // Re-trigger update with current full response
-            updateTranscript(`You: \n\nINDU: ${fullAiResponse}`);
+            updateTranscript(`You: \n\nNAAMIKA: ${fullAiResponse}`);
         }
 
         function appendTranscript(text) {
