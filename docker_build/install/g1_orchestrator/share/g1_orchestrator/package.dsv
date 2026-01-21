@@ -1,0 +1,8 @@
+source;share/g1_orchestrator/hook/cmake_prefix_path.ps1
+source;share/g1_orchestrator/hook/cmake_prefix_path.dsv
+source;share/g1_orchestrator/hook/cmake_prefix_path.sh
+source;share/g1_orchestrator/local_setup.bash
+source;share/g1_orchestrator/local_setup.dsv
+source;share/g1_orchestrator/local_setup.ps1
+source;share/g1_orchestrator/local_setup.sh
+source;share/g1_orchestrator/local_setup.zsh

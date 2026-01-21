@@ -14,14 +14,14 @@ services:
 
   whisper:
     name: "Whisper STT"
-    host: "172.16.4.226"
+    host: "172.16.4.250"
     port: 8001
     health_endpoint: "/health"
     ssh:
-      user: "isaac"
-      password: "7410"
+      user: "b"
+      password: "1997"
       stop_cmd: "pkill -f whisper_server.py"
-      start_cmd: "nohup /home/isaac/Videos/Whisper/whisper_venv/bin/python3 /home/isaac/Videos/Whisper/whisper_server.py > /tmp/whisper.log 2>&1 &"
+      start_cmd: "nohup /home/b/Whisper/whisper_venv/bin/python3 /home/b/Whisper/whisper_server.py > /tmp/whisper.log 2>&1 &"
 
   ollama:
     name: "Ollama LLM"

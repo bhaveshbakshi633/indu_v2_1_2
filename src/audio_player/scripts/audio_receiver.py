@@ -7,6 +7,9 @@ aur /g1/tts/audio_output topic pe publish karta hai.
 
 tts_audio_player (C++) is topic ko subscribe karke G1 speaker pe play karta hai.
 
+NEW: /g1/tts/speech_info topic pe text + is_confirmation publish karta hai
+taaki talking_gestures.py use kar sake.
+
 Usage:
     ros2 run audio_player audio_receiver.py
 
@@ -16,18 +19,24 @@ Test:
 
 import threading
 import time
+import json
+import base64
 from flask import Flask, request, jsonify
 
 import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
-from std_msgs.msg import UInt8MultiArray, Bool, Empty
+from std_msgs.msg import UInt8MultiArray, Bool, Empty, String
+from announcer_utils import AnnouncerTTS
 
 # Constants
 HTTP_PORT = 5050
 AUDIO_TOPIC = "/g1/tts/audio_output"
 STATUS_TOPIC = "/g1/tts/speaking"
 STOP_TOPIC = "/g1/tts/stop"
+TTS_TEXT_TOPIC = "/tts/textmessage"
+SPEECH_INFO_TOPIC = "/g1/tts/speech_info"  # text + is_confirmation
+GESTURE_MODE_TOPIC = "/g1/gesture/mode"  # Gesture mode signal from brain_v2
 
 
 class AudioReceiverNode(Node):
@@ -50,6 +59,20 @@ class AudioReceiverNode(Node):
             10
         )
 
+        # Publisher for speech info (text + is_confirmation) - NEW
+        self.speech_info_pub = self.create_publisher(
+            String,
+            SPEECH_INFO_TOPIC,
+            10
+        )
+
+        # Publisher for gesture mode - brain_v2 se aata hai
+        self.gesture_mode_pub = self.create_publisher(
+            String,
+            GESTURE_MODE_TOPIC,
+            10
+        )
+
         # Subscriber for speaking status (from tts_audio_player)
         self.speaking_sub = self.create_subscription(
             Bool,
@@ -58,6 +81,17 @@ class AudioReceiverNode(Node):
             10
         )
 
+        # Subscriber for text-to-speech messages
+        self.tts_text_sub = self.create_subscription(
+            String,
+            TTS_TEXT_TOPIC,
+            self.tts_text_callback,
+            10
+        )
+
+        # AnnouncerTTS instance - Chatterbox TTS use karega
+        self.announcer = AnnouncerTTS()
+
         self.is_speaking = False
         self.is_muted = False  # Mute flag - jab True ho tab audio forward nahi hoga
         self.last_audio_time = 0
@@ -65,11 +99,45 @@ class AudioReceiverNode(Node):
 
         self.get_logger().info(f"Audio Receiver initialized")
         self.get_logger().info(f"Publishing audio to: {AUDIO_TOPIC}")
+        self.get_logger().info(f"Publishing speech info to: {SPEECH_INFO_TOPIC}")
         self.get_logger().info(f"Listening for status on: {STATUS_TOPIC}")
+        self.get_logger().info(f"Listening for TTS text on: {TTS_TEXT_TOPIC}")
 
     def speaking_callback(self, msg):
         """tts_audio_player se speaking status receive karo"""
         self.is_speaking = msg.data
+
+    def tts_text_callback(self, msg):
+        """Text message receive karo aur TTS se bolo - non-blocking"""
+        text = msg.data
+        if not text:
+            return
+        self.get_logger().info(f"TTS text received: {text}")
+        # Non-blocking - background thread me announce karo
+        threading.Thread(target=self._speak_text, args=(text,), daemon=True).start()
+
+    def _speak_text(self, text):
+        """Background me text speak karo"""
+        try:
+            self.announcer.announce(text, wait=False)
+        except Exception as e:
+            self.get_logger().error(f"TTS error: {e}")
+
+    def publish_speech_info(self, text: str, is_confirmation: bool) -> bool:
+        """Speech info publish karo - text + is_confirmation flag"""
+        try:
+            speech_info = json.dumps({
+                "text": text,
+                "is_confirmation": is_confirmation
+            })
+            msg = String()
+            msg.data = speech_info
+            self.speech_info_pub.publish(msg)
+            self.get_logger().info(f"Speech info published: confirmation={is_confirmation}, text='{text[:50]}...'")
+            return True
+        except Exception as e:
+            self.get_logger().error(f"Failed to publish speech info: {e}")
+            return False
 
     def publish_stop(self) -> bool:
         """Stop command publish karo to tts_audio_player"""
@@ -124,16 +192,46 @@ def play_audio():
     """
     PCM audio receive karo aur ROS2 pe publish karo
 
-    Expected: Raw PCM bytes (16kHz, mono, 16-bit)
+    Supports two formats:
+    1. JSON: {"pcm_base64": "...", "text": "...", "is_confirmation": bool}
+    2. Raw PCM bytes (legacy, backward compatible)
     """
     global ros_node
 
     if ros_node is None:
         return jsonify({"error": "ROS2 node not initialized"}), 503
 
-    pcm_data = request.data
-    if not pcm_data:
-        return jsonify({"error": "No audio data received"}), 400
+    # Check content type
+    content_type = request.content_type or ''
+
+    if 'application/json' in content_type:
+        # NEW: JSON format with metadata
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "Invalid JSON"}), 400
+
+            # Decode PCM from base64
+            pcm_base64 = data.get('pcm_base64', '')
+            if not pcm_base64:
+                return jsonify({"error": "No pcm_base64 in JSON"}), 400
+            pcm_data = base64.b64decode(pcm_base64)
+
+            # Extract metadata
+            text = data.get('text', '')
+            is_confirmation = data.get('is_confirmation', False)
+
+            # Publish speech info PEHLE audio se - taaki talking_gestures.py ready ho
+            if text:
+                ros_node.publish_speech_info(text, is_confirmation)
+
+        except Exception as e:
+            return jsonify({"error": f"JSON parse error: {e}"}), 400
+    else:
+        # Legacy: Raw PCM bytes
+        pcm_data = request.data
+        if not pcm_data:
+            return jsonify({"error": "No audio data received"}), 400
 
     # PCM data publish karo
     success = ros_node.publish_audio(pcm_data)
@@ -148,6 +246,36 @@ def play_audio():
         })
     else:
         return jsonify({"error": "Failed to publish audio"}), 500
+
+
+@app.route('/speech_info', methods=['POST'])
+def speech_info():
+    """
+    Speech metadata receive karo (for streaming TTS)
+
+    JSON: {"text": "...", "is_confirmation": bool}
+    """
+    global ros_node
+
+    if ros_node is None:
+        return jsonify({"error": "ROS2 node not initialized"}), 503
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        text = data.get('text', '')
+        is_confirmation = data.get('is_confirmation', False)
+
+        if text:
+            ros_node.publish_speech_info(text, is_confirmation)
+            return jsonify({"success": True})
+        else:
+            return jsonify({"error": "No text provided"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Error: {e}"}), 400
 
 
 @app.route('/status', methods=['GET'])
@@ -204,6 +332,27 @@ def mute_audio():
     return jsonify({"success": True, "muted": ros_node.is_muted})
 
 
+@app.route('/gesture_mode', methods=['POST'])
+def set_gesture_mode():
+    """Gesture mode set karo - brain_v2 se aata hai conversation ke liye"""
+    global ros_node
+
+    if ros_node is None:
+        return jsonify({"error": "ROS2 node not initialized"}), 503
+
+    data = request.get_json(silent=True) or {}
+    enable = data.get('enable', False)
+    namaste = data.get('namaste', False)
+
+    # Gesture mode publish karo (JSON string)
+    msg = String()
+    msg.data = json.dumps({"enable": enable, "namaste": namaste})
+    ros_node.gesture_mode_pub.publish(msg)
+    ros_node.get_logger().info(f"Gesture mode: enable={enable}, namaste={namaste}")
+
+    return jsonify({"success": True, "enable": enable, "namaste": namaste})
+
+
 def run_flask():
     """Flask server background me run karo"""
     app.run(host='0.0.0.0', port=HTTP_PORT, threaded=True)
@@ -224,7 +373,7 @@ def main(args=None):
         flask_thread.start()
 
         ros_node.get_logger().info(f"HTTP server listening on port {HTTP_PORT}")
-        ros_node.get_logger().info(f"Endpoints: POST /play_audio, /stop, /mute | GET /status, /health")
+        ros_node.get_logger().info(f"Endpoints: POST /play_audio, /speech_info, /stop, /mute | GET /status, /health")
 
         # Multi-threaded executor use karo
         executor = MultiThreadedExecutor()

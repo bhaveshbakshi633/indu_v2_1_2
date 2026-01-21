@@ -1,6 +1,6 @@
 # G1 Orchestrator v2.1 - Configuration Reference
 
-> Last Updated: 2026-01-19 15:00 (IPs updated to 172.16.x.x)
+> Last Updated: 2026-01-19 18:45 (Whisper moved to new PC b@172.16.4.250)
 > Ye file reference ke liye hai - koi bhi config change ho to yahan check karo
 
 ---
@@ -27,8 +27,11 @@
 │  ├── Voice Assistant / brain_v2 (port 8080, HTTPS)              │
 │  └── Password: Ssi@113322                                       │
 │                                                                  │
-│  Isaac PC (isaac@172.16.4.226)                               │
+│  New PC - Whisper (b@172.16.4.250)                               │
 │  ├── Whisper STT (port 8001)                                    │
+│  └── Password: 1997                                             │
+│                                                                  │
+│  Isaac PC (isaac@172.16.4.226)                                  │
 │  ├── Ollama LLM (port 11434)                                    │
 │  └── Password: 7410                                             │
 │                                                                  │
@@ -52,18 +55,18 @@
 ### 2. Whisper STT
 | Field | Value |
 |-------|-------|
-| Host | 172.16.4.226 |
+| Host | 172.16.4.250 |
 | Port | 8001 |
 | Health Endpoint | /health |
-| Location | /home/isaac/Videos/Whisper |
-| Venv | /home/isaac/Videos/Whisper/whisper_venv |
+| Location | /home/b/Whisper |
+| Venv | /home/b/Whisper/whisper_venv |
 | Start Command | `whisper_venv/bin/python3 whisper_server.py` |
 | Log | /tmp/whisper.log |
 
 ### 3. Ollama LLM
 | Field | Value |
 |-------|-------|
-| Host | 172.16.4.226 |
+| Host | 172.16.4.250 |
 | Port | 11434 |
 | Health Endpoint | /api/tags |
 | Model | llama3.1:8b |
@@ -94,8 +97,8 @@
 | TTS Backend | chatterbox |
 | LLM Model | llama3.1:8b |
 | LLM Deployment | remote |
-| LLM Remote Host | 172.16.4.226:11434 |
-| Whisper Host | 172.16.4.226:8001 |
+| LLM Remote Host | 172.16.4.250:11434 |
+| Whisper Host | 172.16.4.250:8001 |
 | Chatterbox Host | 127.0.0.1:8000 (local) |
 | G1 Audio Host | 172.16.2.242:5050 |
 | RAG Enabled | true |
@@ -194,7 +197,7 @@ docker exec arm_controller bash -c 'source /opt/ros/humble/setup.bash && source 
 
 ---
 
-## Ollama Systemd Service (Isaac PC)
+## Ollama Systemd Service (New PC (b))
 
 **File:** `/etc/systemd/system/ollama.service`
 
@@ -230,8 +233,8 @@ ss -tlnp | grep 11434
 2. Manually test service:
    ```bash
    curl http://172.16.6.19:8000/health  # Chatterbox
-   curl http://172.16.4.226:8001/health  # Whisper
-   curl http://172.16.4.226:11434/api/tags  # Ollama
+   curl http://172.16.4.250:8001/health  # Whisper
+   curl http://172.16.4.250:11434/api/tags  # Ollama
    curl -k https://172.16.6.19:8080/api/health  # brain_v2
    ```
 
@@ -241,7 +244,7 @@ ss -tlnp | grep 11434
 
 ### Voice Assistant Error
 - Check brain_v2 config.json has correct LLM remote host
-- LLM remote host should be 172.16.4.226 (NOT localhost)
+- LLM remote host should be 172.16.4.250 (NOT localhost)
 
 ---
 
@@ -254,7 +257,7 @@ ss -tlnp | grep 11434
 | Orchestrator Config | ~/deployed/v2_1/config/orchestrator_config.yaml |
 | brain_v2 Code | ssi@172.16.6.19:~/Downloads/indu_brain_v2_1_1 |
 | brain_v2 Config | ssi@172.16.6.19:~/Downloads/indu_brain_v2_1_1/config.json |
-| Whisper Server | isaac@172.16.4.226:/home/isaac/Videos/Whisper |
+| Whisper Server | isaac@172.16.4.250:/home/b/Whisper |
 | Chatterbox | ssi@172.16.6.19:~/Music/chatterbox |
 
 ---

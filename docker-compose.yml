@@ -28,6 +28,9 @@ services:
     runtime: nvidia
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./src/audio_player/scripts/audio_receiver.py:/ros2_ws/install/audio_player/lib/audio_player/audio_receiver.py:ro
+      - ./src/audio_player/scripts/announcer_utils.py:/ros2_ws/install/audio_player/lib/audio_player/announcer_utils.py:ro
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -86,6 +89,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     volumes:
       - ./config:/ros2_ws/config:ro
+      - ./docker_build/install/g1_orchestrator/lib/g1_orchestrator/g1_orchestrator_node:/ros2_ws/install/g1_orchestrator/lib/g1_orchestrator/g1_orchestrator_node:ro
     depends_on:
       startup_health_check:
         condition: service_healthy
@@ -173,3 +177,52 @@ services:
         max-size: "10m"
         max-file: "3"
     command: ros2 launch shakal_ros shakal.launch.py
+
+  # ============================================================
+  # HTTP ACTION BRIDGE - Voice commands via HTTP
+  # Endpoint: POST http://172.16.2.242:5051/action
+  # Publishes to: /voice/action_request
+  # ============================================================
+  http_action_bridge:
+    image: g1_orchestrator:v2.13
+    container_name: http_action_bridge
+    hostname: http_action_bridge
+    network_mode: host
+    privileged: true
+    runtime: nvidia
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./src/http_action_bridge/http_action_bridge/bridge_node.py:/ros2_ws/bridge_node.py:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python3 /ros2_ws/bridge_node.py
+
+  talking_gestures:
+    image: g1_orchestrator:v2.13
+    container_name: talking_gestures
+    hostname: talking_gestures
+    network_mode: host
+    privileged: true
+    runtime: nvidia
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    volumes:
+      - ./src/audio_player/scripts/talking_gestures.py:/ros2_ws/talking_gestures.py:ro
+    depends_on:
+      startup_health_check:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: python3 /ros2_ws/talking_gestures.py
