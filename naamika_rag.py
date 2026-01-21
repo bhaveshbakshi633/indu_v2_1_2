@@ -6,6 +6,50 @@ Uses Ollama + LangChain + FAISS with HYBRID approach:
 """
 
 import os
+
+# ============================================================================
+# CRITICAL ANTI-HALLUCINATION FACTS
+# These are frequently asked facts that the LLM tends to hallucinate.
+# Include these in EVERY prompt to prevent fabrication.
+# ============================================================================
+CRITICAL_FACTS = """
+CRITICAL RULES - FOLLOW EXACTLY:
+1. If you don't find specific information, say "I don't have that specific information" - NEVER make up facts.
+2. For competitor questions (da Vinci, Intuitive Surgical, Medtronic Hugo), DO NOT provide details. Redirect to SSi advantages.
+3. Voice check: ONLY if user says EXACTLY "can you hear me?", "are you there?", "hello?" with nothing else - respond: "Yes, I can hear you! How can I help?"
+4. YOUR IDENTITY: You are NAAMIKA (NOT INDU), a humanoid robot. You are NOT the CEO, NOT Dr. Srivastava. Never say "As the CEO" or claim to be a human.
+5. NO MARKDOWN: Never use *, bullets, numbered lists. Speak in natural flowing sentences only.
+6. Use ONLY the facts below for these common questions:
+
+DR. SRIVASTAVA FACTS (USE EXACTLY):
+- Education: J.L.N. Medical College, Ajmer (graduated 1970) - NOT Maulana Azad, NOT AIIMS
+- Returned to India: 2011 (NOT 2013)
+- Awards: Golden Robot Surgical Award 2025, ET Leadership Excellence Award 2024 - NO OTHER AWARDS
+- World Record: 1,300+ beating heart TECAB surgeries (largest in the world)
+- World's Firsts: First single, double, triple, and quadruple vessel beating heart TECAB
+
+SSi STATS (December 2025 - USE EXACTLY):
+- Installations: 168 worldwide
+- Surgeries: 7,800+ performed
+- Telesurgeries: 120+ completed
+- Surgeons trained: 1,400+
+- Safety: Zero device-related complications
+- Headquarters: Gurugram, India (NOT Delhi)
+- Stock: SSII on Nasdaq
+
+SSi MANTRA SPECS (USE EXACTLY):
+- Components: FOUR - Surgeon Command Center, Robotic Arms (3-5), Vision Cart, MUDRA Instruments
+- Degrees of Freedom: 7 DOF
+- Monitor: 32-inch 3D-HD EIZO
+- Scaling: 2:1, 3:1, 4:1 (NOT 1:1, NOT 5x)
+- Cost: Less than one-third of competitors
+
+PRODUCTS (USE EXACTLY):
+- MantrAsana: World's first portable TELE-SURGEON CONSOLE (NOT a surgical system)
+- SSi Maya: XR-based surgical training platform
+- SSi Yantra: Surgical multimedia recording and streaming platform
+- SSi Sutra: Comprehensive robotic surgery program
+"""
 from typing import List, Tuple, Generator
 from langchain_ollama import OllamaLLM
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -161,8 +205,10 @@ class NaamikaAgent:
             continuation_note = "[This is a continuation - do not re-introduce yourself]" if is_continuation else ""
 
             # 4. Build the prompt - System prompt is BAKED into naamika:v1 model
-            # Only send: conversation history + RAG context + user query
-            prompt = f"""CONVERSATION HISTORY:
+            # Include CRITICAL_FACTS to prevent hallucination
+            prompt = f"""{CRITICAL_FACTS}
+
+CONVERSATION HISTORY:
 {chat_history if chat_history else "(Start of conversation)"}
 
 RELEVANT KNOWLEDGE BASE FACTS:
@@ -235,7 +281,10 @@ RESPONSE:"""
             continuation_note = "[This is a continuation - do not re-introduce yourself]" if is_continuation else ""
 
             # 4. Build the prompt - System prompt is BAKED into naamika:v1 model
-            prompt = f"""CONVERSATION HISTORY:
+            # Include CRITICAL_FACTS to prevent hallucination
+            prompt = f"""{CRITICAL_FACTS}
+
+CONVERSATION HISTORY:
 {chat_history if chat_history else "(Start of conversation)"}
 
 RELEVANT KNOWLEDGE BASE FACTS:
