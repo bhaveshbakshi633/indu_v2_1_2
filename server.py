@@ -1653,7 +1653,7 @@ class WebStreamingAssistant:
             sample_rate=16000,
             chunk_size=512,
             vad_threshold=0.5,  # Regular speech detection
-            silence_timeout=1.5,
+            silence_timeout=0.0,  # No delay - immediate send on silence
             interrupt_threshold=0.7,  # Interrupt detection (lowered from 0.98 for better sensitivity)
             interrupt_frame_duration=0.3,  # Shorter frame duration (lowered from 0.5s)
             interrupt_frames_needed=2,  # Need 2 consecutive frames (increased for stability)
