@@ -57,6 +57,15 @@ ALL_STOP_KEYWORDS = {
     StopType.CASUAL: CASUAL_KEYWORDS,
 }
 
+# Exclusion patterns - these contain "stop" but are NOT emergency stops
+# These are valid commands that should go through the normal pipeline
+STOP_EXCLUSIONS = [
+    "stop mapping",      # SLAM command
+    "stop navigation",   # SLAM command
+    "stop talking",      # Mode change
+    "stop speaking",     # Mode change
+]
+
 
 def detect_stop(transcript: str) -> StopDetectionResult:
     """
@@ -77,6 +86,17 @@ def detect_stop(transcript: str) -> StopDetectionResult:
         )
 
     lower = transcript.lower().strip()
+
+    # First check exclusions - these are valid commands, not emergency stops
+    for exclusion in STOP_EXCLUSIONS:
+        if exclusion in lower:
+            logger.info(f"[STOP FAST-PATH] Excluded (valid command): '{exclusion}' in '{transcript}'")
+            return StopDetectionResult(
+                is_stop=False,
+                stop_type=None,
+                matched_keyword=None,
+                original_transcript=transcript
+            )
 
     # Priority order me check karo
     for stop_type, keywords in ALL_STOP_KEYWORDS.items():

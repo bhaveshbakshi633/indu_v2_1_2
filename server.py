@@ -131,6 +131,16 @@ except ImportError as e:
     print(f"[WARN] Voice control not available: {e}")
     VOICE_CONTROL_AVAILABLE = False
 
+# SLAM navigation client
+try:
+    from slam_client import get_slam_client, SLAMClient
+    SLAM_AVAILABLE = True
+    print("[OK] SLAM client loaded")
+except ImportError as e:
+    print(f"[WARN] SLAM client not available: {e}")
+    SLAM_AVAILABLE = False
+    VOICE_CONTROL_AVAILABLE = False
+
 
 # ============================================================
 # ROS2 PLAYBACK STATUS PUBLISHER
@@ -1653,7 +1663,7 @@ class WebStreamingAssistant:
             sample_rate=16000,
             chunk_size=512,
             vad_threshold=0.5,  # Regular speech detection
-            silence_timeout=0.0,  # No delay - immediate send on silence
+            silence_timeout=0.5,  # 500ms delay before sending on silence
             interrupt_threshold=0.7,  # Interrupt detection (lowered from 0.98 for better sensitivity)
             interrupt_frame_duration=0.3,  # Shorter frame duration (lowered from 0.5s)
             interrupt_frames_needed=2,  # Need 2 consecutive frames (increased for stability)
@@ -2104,24 +2114,31 @@ class WebStreamingAssistant:
                             # Execute action directly (confirmed or LOW risk)
                             print(f"[ROBOT] Executing action: {intent.action_name}")
 
-                            # Send action to G1 via HTTP (not ROS2 - network architecture constraint)
-                            try:
-                                action_response = requests.post(
-                                    "http://172.16.2.242:5051/action",
-                                    json={"action": intent.action_name, "source": "voice_assistant"},
-                                    timeout=5
-                                )
-                                if action_response.status_code == 200:
-                                    print(f"[G1] Action sent: {intent.action_name}")
-                                else:
-                                    print(f"[G1] Action rejected: {action_response.text}")
-                            except requests.exceptions.ConnectionError:
-                                print(f"[G1] HTTP bridge not available at 172.16.2.242:5051")
-                            except Exception as e:
-                                print(f"[G1] Action send failed: {e}")
+                            # Check if this is a SLAM action
+                            slam_response = self._handle_slam_action(intent.action_name)
+                            if slam_response is not None:
+                                # SLAM action handled
+                                ack = slam_response
+                            else:
+                                # Regular robot action - send to G1 via HTTP
+                                try:
+                                    action_response = requests.post(
+                                        "http://172.16.2.242:5051/action",
+                                        json={"action": intent.action_name, "source": "voice_assistant"},
+                                        timeout=5
+                                    )
+                                    if action_response.status_code == 200:
+                                        print(f"[G1] Action sent: {intent.action_name}")
+                                    else:
+                                        print(f"[G1] Action rejected: {action_response.text}")
+                                except requests.exceptions.ConnectionError:
+                                    print(f"[G1] HTTP bridge not available at 172.16.2.242:5051")
+                                except Exception as e:
+                                    print(f"[G1] Action send failed: {e}")
 
-                            # Acknowledge action on G1 speaker (short ack - no gestures)
-                            ack = f"Okay, {intent.action_name.lower().replace('_', ' ')}."
+                                # Acknowledge action on G1 speaker (short ack - no gestures)
+                                ack = f"Okay, {intent.action_name.lower().replace('_', ' ')}."
+
                             self._send_transcript(ws, f"You: {transcript}\n\n[ROBOT] {ack}", replace=True)
                             self.state = "speaking"
                             self._send_state(ws, "speaking")
@@ -2222,6 +2239,103 @@ class WebStreamingAssistant:
             }))
         except Exception as e:
             print(f"[WARN]  Error sending state: {e}")
+
+    def _handle_slam_action(self, action_name: str) -> str:
+        """
+        Handle SLAM navigation actions
+        Returns acknowledgment message if handled, None if not a SLAM action
+        """
+        if not SLAM_AVAILABLE:
+            print("[SLAM] SLAM client not available")
+            return None
+
+        slam_client = get_slam_client()
+
+        # Parse action name for parameterized commands
+        if action_name.startswith("SAVE_WAYPOINT:"):
+            waypoint_name = action_name.split(":", 1)[1]
+            response = slam_client.save_waypoint(waypoint_name)
+            if response.success:
+                return f"Saved this location as {waypoint_name}."
+            else:
+                return f"Could not save waypoint: {response.message}"
+
+        elif action_name.startswith("GOTO_WAYPOINT:"):
+            waypoint_name = action_name.split(":", 1)[1]
+            response = slam_client.goto_waypoint(waypoint_name)
+            if response.success:
+                return f"Navigating to {waypoint_name}."
+            else:
+                return f"Could not navigate: {response.message}"
+
+        # Simple SLAM actions
+        elif action_name == "START_MAPPING":
+            response = slam_client.start_mapping()
+            if response.success:
+                return "Starting mapping mode. Walk around to create a map."
+            else:
+                return f"Could not start mapping: {response.message}"
+
+        elif action_name == "STOP_MAPPING":
+            response = slam_client.stop_mapping()
+            if response.success:
+                return "Map saved successfully."
+            else:
+                return f"Could not save map: {response.message}"
+
+        elif action_name.startswith("STOP_MAPPING:"):
+            map_name = action_name.split(":", 1)[1]
+            response = slam_client.stop_mapping(map_name)
+            if response.success:
+                return f"Map saved as {map_name}."
+            else:
+                return f"Could not save map: {response.message}"
+
+        elif action_name == "START_NAVIGATION":
+            response = slam_client.start_navigation()
+            if response.success:
+                return "Navigation mode started."
+            else:
+                return f"Could not start navigation: {response.message}"
+
+        elif action_name.startswith("START_NAVIGATION:"):
+            map_name = action_name.split(":", 1)[1]
+            response = slam_client.start_navigation(map_name)
+            if response.success:
+                return f"Navigation mode started with map {map_name}."
+            else:
+                return f"Could not start navigation: {response.message}"
+
+        elif action_name == "PAUSE_NAV":
+            response = slam_client.pause()
+            if response.success:
+                return "Navigation paused."
+            else:
+                return f"Could not pause: {response.message}"
+
+        elif action_name == "RESUME_NAV":
+            response = slam_client.resume()
+            if response.success:
+                return "Resuming navigation."
+            else:
+                return f"Could not resume: {response.message}"
+
+        elif action_name == "LIST_WAYPOINTS":
+            waypoint_names = slam_client.get_waypoint_names()
+            if waypoint_names:
+                return f"Saved waypoints: {', '.join(waypoint_names)}."
+            else:
+                return "No waypoints saved yet."
+
+        elif action_name == "LIST_MAPS":
+            map_names = slam_client.get_map_names()
+            if map_names:
+                return f"Available maps: {', '.join(map_names)}."
+            else:
+                return "No maps saved yet."
+
+        # Not a SLAM action
+        return None
 
     def _send_transcript(self, ws, text, replace=False):
         """Send transcript update to client"""

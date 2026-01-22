@@ -87,5 +87,11 @@
   "web_interface": {
     "enabled": false,
     "message": "Not Available - Placeholder"
+  },
+  "slam": {
+    "enabled": true,
+    "host": "172.16.2.242",
+    "port": 5052,
+    "timeout": 30.0
   }
 }
