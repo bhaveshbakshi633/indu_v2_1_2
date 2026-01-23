@@ -1,0 +1,6 @@
+# Remove a person from database
+
+string name
+---
+bool success
+string message

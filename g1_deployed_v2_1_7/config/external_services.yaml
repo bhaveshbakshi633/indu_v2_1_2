@@ -1,0 +1,58 @@
+# External Services Configuration
+# G1 startup pe ye services check hongi
+
+services:
+  chatterbox:
+    name: "Chatterbox TTS"
+    host: "172.16.6.19"
+    port: 8000
+    health_endpoint: "/health"
+    ssh:
+      user: "ssi"
+      password: "Ssi@113322"
+      start_cmd: "cd ~/Music/chatterbox && source .venv/bin/activate && nohup python tts_server.py > /tmp/chatterbox.log 2>&1 &"
+
+  whisper:
+    name: "Whisper STT"
+    host: "172.16.4.250"
+    port: 8001
+    health_endpoint: "/health"
+    ssh:
+      user: "b"
+      password: "1997"
+      stop_cmd: "pkill -f whisper_server.py"
+      start_cmd: "nohup /home/b/Whisper/whisper_venv/bin/python3 /home/b/Whisper/whisper_server.py > /tmp/whisper.log 2>&1 &"
+
+  ollama:
+    name: "Ollama LLM"
+    host: "172.16.4.226"
+    port: 11434
+    health_endpoint: "/api/tags"
+    ssh:
+      user: "isaac"
+      password: "7410"
+      start_cmd: "OLLAMA_HOST=0.0.0.0:11434 OLLAMA_MODELS=/usr/share/ollama/.ollama/models nohup ollama serve > /tmp/ollama.log 2>&1 &"
+
+  brain_v2:
+    name: "Voice Assistant"
+    host: "172.16.6.19"
+    port: 8080
+    protocol: "https"
+    verify_ssl: false
+    health_endpoint: "/api/health"
+    ssh:
+      user: "ssi"
+      password: "Ssi@113322"
+      start_cmd: "cd ~/Downloads/naamika_brain_v2_1_7 && nohup python3 server.py > /tmp/brain_v2.log 2>&1 &"
+
+announcements:
+  checking: "Checking external servers"
+  server_ok: "{name} server running"
+  server_down: "{name} server not responding"
+  restart_attempt: "Attempting to restart {name}"
+  restart_success: "{name} started successfully"
+  restart_failed: "Failed to start {name}. Please check manually."
+  all_ready: "All external servers ready"
+  arm_init: "Arm controller initializing"
+  orchestrator_ready: "G1 orchestrator ready"
+  system_ready: "System startup complete. Ready for operation."

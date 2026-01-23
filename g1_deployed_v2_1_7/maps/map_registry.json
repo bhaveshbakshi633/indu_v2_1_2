@@ -1,0 +1,14 @@
+{
+  "default_map": {
+    "path": "/home/unitree/default_map.pcd",
+    "created": "2026-01-22T07:48:01.833348"
+  },
+  "office": {
+    "path": "/home/unitree/office.pcd",
+    "created": "2026-01-22T07:00:00.000000"
+  },
+  "home": {
+    "path": "/home/unitree/home.pcd",
+    "created": "2026-01-22T11:31:54.361407"
+  }
+}

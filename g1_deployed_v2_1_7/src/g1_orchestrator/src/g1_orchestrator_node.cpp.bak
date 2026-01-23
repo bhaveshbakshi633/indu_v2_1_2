@@ -1,0 +1,398 @@
+/**
+ * @file g1_orchestrator_node.cpp
+ * @brief G1 Orchestrator - Central control node for robot actions
+ * 
+ * Phase 6: Init Action with LocoClient
+ * - FSM transitions: DAMP -> STAND_UP -> READY
+ * - Communication verification
+ */
+
+#include <rclcpp/rclcpp.hpp>
+#include <orchestrator_msgs/msg/action_command.hpp>
+#include <unitree_hg/msg/low_state.hpp>
+#include <string>
+#include <memory>
+#include <mutex>
+#include <array>
+#include <chrono>
+#include <thread>
+
+// LocoClient header from v1 SDK
+#include "g1/g1_loco_client.hpp"
+
+// ============================================================================
+// Constants (from robot_init.py reference)
+// ============================================================================
+
+namespace JointIndices {
+    constexpr std::array<int, 7> LEFT_ARM = {15, 16, 17, 18, 19, 20, 21};
+    constexpr std::array<int, 7> RIGHT_ARM = {22, 23, 24, 25, 26, 27, 28};
+    constexpr std::array<int, 3> WAIST = {12, 13, 14};
+    constexpr int MOTOR_COUNT = 35;
+}
+
+namespace FSMState {
+    constexpr int ZERO_TORQUE = 0;
+    constexpr int DAMP = 1;
+    constexpr int STAND_UP = 4;
+    constexpr int READY = 801;
+}
+
+// Timing constants (from robot_init.py)
+constexpr double STANDUP_WAIT_SEC = 10.0;
+constexpr double HOLD_DURATION_SEC = 10.0;
+constexpr double STIFFNESS_RAMP_SEC = 2.0;
+constexpr double BLEND_DURATION_SEC = 3.0;
+
+// Home positions (radians) from robot_init.py
+constexpr std::array<float, 7> HOME_LEFT = {0.4f, 0.15f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f};
+constexpr std::array<float, 7> HOME_RIGHT = {0.4f, -0.15f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f};
+
+// ============================================================================
+// G1 Orchestrator Node
+// ============================================================================
+
+class G1OrchestratorNode : public rclcpp::Node
+{
+public:
+    G1OrchestratorNode() : Node("g1_orchestrator")
+    {
+        RCLCPP_INFO(this->get_logger(), "G1 Orchestrator Node starting...");
+        
+        // Initialize LocoClient for FSM control
+        loco_client_ = std::make_unique<unitree::robot::g1::LocoClient>(this);
+        RCLCPP_INFO(this->get_logger(), "LocoClient initialized");
+        
+        // Action command subscriber
+        action_sub_ = this->create_subscription<orchestrator_msgs::msg::ActionCommand>(
+            "/orchestrator/action_command", 10,
+            std::bind(&G1OrchestratorNode::action_callback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Subscribed to /orchestrator/action_command");
+        
+        // LowState subscriber
+        lowstate_sub_ = this->create_subscription<unitree_hg::msg::LowState>(
+            "rt/lowstate", 10,
+            std::bind(&G1OrchestratorNode::lowstate_callback, this, std::placeholders::_1));
+        RCLCPP_INFO(this->get_logger(), "Subscribed to rt/lowstate");
+        
+        RCLCPP_INFO(this->get_logger(), "G1 Orchestrator ready - waiting for commands...");
+    }
+
+private:
+    // ========================================================================
+    // LowState Callback
+    // ========================================================================
+    
+    void lowstate_callback(const unitree_hg::msg::LowState::SharedPtr msg)
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        
+        mode_machine_ = msg->mode_machine;
+        
+        for (size_t i = 0; i < msg->motor_state.size() && i < JointIndices::MOTOR_COUNT; ++i) {
+            current_positions_[i] = msg->motor_state[i].q;
+            current_velocities_[i] = msg->motor_state[i].dq;
+        }
+        
+        if (!lowstate_received_) {
+            lowstate_received_ = true;
+            RCLCPP_INFO(this->get_logger(), "First LowState received! mode_machine=%d", mode_machine_);
+        }
+        
+        lowstate_count_++;
+    }
+    
+    // ========================================================================
+    // Communication Verification
+    // ========================================================================
+    
+    bool verify_communication(double timeout_sec = 5.0)
+    {
+        RCLCPP_INFO(this->get_logger(), "Verifying robot communication...");
+        
+        auto start_time = this->now();
+        rclcpp::Rate rate(10);
+        
+        while (rclcpp::ok()) {
+            {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                if (lowstate_received_) {
+                    RCLCPP_INFO(this->get_logger(), 
+                        "Communication verified! mode_machine=%d", mode_machine_);
+                    return true;
+                }
+            }
+            
+            double elapsed = (this->now() - start_time).seconds();
+            if (elapsed > timeout_sec) {
+                RCLCPP_ERROR(this->get_logger(), 
+                    "Communication verification FAILED! No lowstate in %.1f sec", timeout_sec);
+                return false;
+            }
+            
+            rclcpp::spin_some(this->get_node_base_interface());
+            rate.sleep();
+        }
+        return false;
+    }
+    
+    // ========================================================================
+    // FSM Helpers
+    // ========================================================================
+    
+    int get_current_fsm()
+    {
+        int fsm_id = 0;
+        int32_t result = loco_client_->GetFsmId(fsm_id);
+        if (result != 0) {
+            RCLCPP_WARN(this->get_logger(), "GetFsmId failed with code %d", result);
+        }
+        return fsm_id;
+    }
+    
+    bool wait_for_fsm(int target_fsm, double timeout_sec = 15.0)
+    {
+        RCLCPP_INFO(this->get_logger(), "Waiting for FSM %d...", target_fsm);
+        
+        auto start_time = this->now();
+        rclcpp::Rate rate(5);  // 5 Hz check
+        
+        while (rclcpp::ok()) {
+            int current_fsm = get_current_fsm();
+            
+            if (current_fsm == target_fsm) {
+                RCLCPP_INFO(this->get_logger(), "FSM reached: %d", target_fsm);
+                return true;
+            }
+            
+            double elapsed = (this->now() - start_time).seconds();
+            if (elapsed > timeout_sec) {
+                RCLCPP_ERROR(this->get_logger(), 
+                    "FSM wait timeout! Current=%d, Target=%d", current_fsm, target_fsm);
+                return false;
+            }
+            
+            rclcpp::spin_some(this->get_node_base_interface());
+            rate.sleep();
+        }
+        return false;
+    }
+    
+    // ========================================================================
+    // Action Callback
+    // ========================================================================
+    
+    void action_callback(const orchestrator_msgs::msg::ActionCommand::SharedPtr msg)
+    {
+        RCLCPP_INFO(this->get_logger(), "Received action: %s (priority: %d)", 
+                    msg->action_name.c_str(), msg->priority);
+        
+        for (const auto& param : msg->parameters) {
+            RCLCPP_INFO(this->get_logger(), "  Parameter: %s", param.c_str());
+        }
+        
+        if (msg->action_name == "init") {
+            execute_init(msg->parameters);
+        } else if (msg->action_name == "damp") {
+            execute_damp();
+        } else if (msg->action_name == "verify") {
+            execute_verify();
+        } else if (msg->action_name == "status") {
+            execute_status();
+        } else if (msg->action_name == "standup") {
+            execute_standup();
+        } else if (msg->action_name == "ready") {
+            execute_ready();
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Unknown action: %s", msg->action_name.c_str());
+        }
+    }
+    
+    // ========================================================================
+    // Action Handlers
+    // ========================================================================
+    
+    void execute_verify()
+    {
+        RCLCPP_INFO(this->get_logger(), "=== VERIFY ACTION ===");
+        if (verify_communication(5.0)) {
+            RCLCPP_INFO(this->get_logger(), "Verification: SUCCESS");
+            RCLCPP_INFO(this->get_logger(), "Current FSM: %d", get_current_fsm());
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Verification: FAILED");
+        }
+        RCLCPP_INFO(this->get_logger(), "=====================");
+    }
+    
+    void execute_status()
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        RCLCPP_INFO(this->get_logger(), "=== STATUS ===");
+        RCLCPP_INFO(this->get_logger(), "lowstate_received: %s", lowstate_received_ ? "true" : "false");
+        RCLCPP_INFO(this->get_logger(), "lowstate_count: %lu", lowstate_count_);
+        RCLCPP_INFO(this->get_logger(), "mode_machine: %d", mode_machine_);
+        RCLCPP_INFO(this->get_logger(), "is_initialized: %s", is_initialized_ ? "true" : "false");
+        RCLCPP_INFO(this->get_logger(), "FSM ID: %d", get_current_fsm());
+        RCLCPP_INFO(this->get_logger(), "==============");
+    }
+    
+    void execute_damp()
+    {
+        RCLCPP_INFO(this->get_logger(), "=== DAMP ACTION ===");
+        RCLCPP_INFO(this->get_logger(), "Calling Damp()...");
+        
+        int32_t result = loco_client_->Damp();
+        
+        if (result == 0) {
+            RCLCPP_INFO(this->get_logger(), "Damp() SUCCESS");
+            is_initialized_ = false;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Damp() FAILED with code %d", result);
+        }
+        RCLCPP_INFO(this->get_logger(), "===================");
+    }
+    
+    void execute_standup()
+    {
+        RCLCPP_INFO(this->get_logger(), "=== STANDUP ACTION ===");
+        RCLCPP_INFO(this->get_logger(), "Calling StandUp() (FSM 4)...");
+        
+        int32_t result = loco_client_->StandUp();
+        
+        if (result == 0) {
+            RCLCPP_INFO(this->get_logger(), "StandUp() SUCCESS - robot standing up");
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "StandUp() FAILED with code %d", result);
+        }
+        RCLCPP_INFO(this->get_logger(), "======================");
+    }
+    
+    void execute_ready()
+    {
+        RCLCPP_INFO(this->get_logger(), "=== READY ACTION ===");
+        RCLCPP_INFO(this->get_logger(), "Calling Start() (FSM 801)...");
+        
+        int32_t result = loco_client_->Start();
+        
+        if (result == 0) {
+            RCLCPP_INFO(this->get_logger(), "Start() SUCCESS - robot in READY mode");
+            is_initialized_ = true;
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Start() FAILED with code %d", result);
+        }
+        RCLCPP_INFO(this->get_logger(), "====================");
+    }
+    
+    void execute_init(const std::vector<std::string>& params)
+    {
+        RCLCPP_INFO(this->get_logger(), "");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "    AUTOMATIC BOOT SEQUENCE");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        
+        // Check skip_if_done parameter
+        bool skip_if_done = false;
+        for (const auto& p : params) {
+            if (p == "skip_if_done=true") skip_if_done = true;
+        }
+        
+        if (skip_if_done && is_initialized_) {
+            RCLCPP_INFO(this->get_logger(), "Already initialized, skipping...");
+            return;
+        }
+        
+        // Step 1: Verify communication
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Step 1: Verifying communication...");
+        if (!verify_communication(5.0)) {
+            RCLCPP_ERROR(this->get_logger(), "[BOOT] FAILED: No communication");
+            return;
+        }
+        
+        // Step 2: DAMP (FSM 1)
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Step 2: DAMP (FSM 1)");
+        int32_t result = loco_client_->Damp();
+        if (result != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[BOOT] Damp() failed: %d", result);
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        
+        // Step 3: STAND_UP (FSM 4)
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Step 3: STAND_UP (FSM 4)");
+        result = loco_client_->StandUp();
+        if (result != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[BOOT] StandUp() failed: %d", result);
+            return;
+        }
+        
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Waiting %.0f seconds for robot to stand...", STANDUP_WAIT_SEC);
+        std::this_thread::sleep_for(std::chrono::duration<double>(STANDUP_WAIT_SEC));
+        
+        // Step 4: READY (FSM 801 via Start())
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Step 4: READY (FSM 801)");
+        result = loco_client_->Start();
+        if (result != 0) {
+            RCLCPP_ERROR(this->get_logger(), "[BOOT] Start() failed: %d", result);
+            return;
+        }
+        
+        // Step 5: Capture hold position
+        RCLCPP_INFO(this->get_logger(), "[BOOT] Step 5: Position captured");
+        {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            hold_positions_ = current_positions_;
+        }
+        
+        // Mark as initialized
+        is_initialized_ = true;
+        
+        RCLCPP_INFO(this->get_logger(), "");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "    AUTOMATIC BOOT COMPLETE!");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "");
+        
+        // Note: Stiffness ramp and move to HOME require arm SDK publishing
+        // That will be Phase 6b - for now, basic FSM sequence is complete
+        RCLCPP_INFO(this->get_logger(), "NOTE: Stiffness ramp and HOME motion not yet implemented");
+        RCLCPP_INFO(this->get_logger(), "Robot is in READY mode with FSM control");
+    }
+    
+    // ========================================================================
+    // Member Variables
+    // ========================================================================
+    
+    // LocoClient for FSM control
+    std::unique_ptr<unitree::robot::g1::LocoClient> loco_client_;
+    
+    // Subscribers
+    rclcpp::Subscription<orchestrator_msgs::msg::ActionCommand>::SharedPtr action_sub_;
+    rclcpp::Subscription<unitree_hg::msg::LowState>::SharedPtr lowstate_sub_;
+    
+    // State mutex
+    std::mutex state_mutex_;
+    
+    // Robot state
+    bool lowstate_received_{false};
+    size_t lowstate_count_{0};
+    int mode_machine_{0};
+    std::array<float, 35> current_positions_{};
+    std::array<float, 35> current_velocities_{};
+    std::array<float, 35> hold_positions_{};
+    
+    // Orchestrator state
+    bool is_initialized_{false};
+};
+
+// ============================================================================
+// Main
+// ============================================================================
+
+int main(int argc, char** argv)
+{
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<G1OrchestratorNode>();
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}

@@ -1,0 +1,7 @@
+# Set OBSBOT camera FOV
+
+string fov
+---
+bool success
+string message
+string current_fov
